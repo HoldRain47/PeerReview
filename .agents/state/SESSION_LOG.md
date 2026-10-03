@@ -55,3 +55,8 @@
 - 결과: docs/자료출처조사.md 작성. 주 출처는 Europe PMC 경유 CC BY JATS XML(RSC Advances·Membranes), MDPI Processes는 내려받기 방법 확인 후 추가, ChemRxiv는 PDF 시험용.
 - 증거: Europe PMC·Crossref API 조회값(2026-10-03), XML 1편 구조 확인. MDPI·ChemRxiv 자동 조회 403. 사용자 이메일 전송 오류 E002.
 - 남은 것: 사용자 승인, 화학공학 주제 범위 기준(T002.4).
+
+## 2026-10-03 T002.2 입력 처리 시범 [review]
+- 결과: src/peerreview/ingest.py(XML·PDF 입력, 구간 종류, 처리 상태, 원문 위치 대응), CLI `peerreview ingest`(원문 없는 요약만 출력), 비교 스크립트와 docs/입력처리비교.md. pypdf 채택.
+- 증거: 공개 5편 XML 대비 pypdf recall 0.850~0.995, 위치 대응 전 구간 성공, `uv run pytest -q` 19 passed, ruff 통과, verifier 지적 9건 반영.
+- 남은 것: 비공개 원고 사용자 실행(요약과 확인 1~4), MDPI 뒷부분 절 제거, Windows 10 실기 확인.

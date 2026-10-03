@@ -7,7 +7,10 @@ authors = [
     { name = "holdrain47", email = "holdrain47@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pdfplumber>=0.11.10",
+    "pypdf>=6.19.0",
+]
 
 [project.scripts]
 peerreview = "peerreview:main"

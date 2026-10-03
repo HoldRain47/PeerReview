@@ -1,0 +1,295 @@
+"""입력 처리 시험. 실제 원고 대신 시험 안에서 만든 가상 문서만 쓴다."""
+
+import json
+
+from peerreview import ingest, main
+from peerreview.ingest import (
+    FORMULA_PLACEHOLDER,
+    SegmentKind,
+    _paragraphs,
+    _repair_glyphs,
+    _running_lines,
+    _strip_line_numbers,
+    load,
+    resolve_jats,
+    source_text,
+    summarize,
+)
+from peerreview.model import ProcessingStatus
+
+FILLER = "The membrane was tested in a reactor and the flux of water was measured at each step. "
+
+JATS = f"""<?xml version="1.0" encoding="UTF-8"?>
+<article xmlns:mml="http://www.w3.org/1998/Math/MathML">
+<front><article-meta>
+<abstract abstract-type="graphical"><p>Graphical abstract text.</p></abstract>
+<abstract><p>We report a membrane process for CO<sub>2</sub> capture.</p></abstract>
+</article-meta></front>
+<body>
+<sec><title>1. Introduction</title>
+<p>{FILLER * 30}The rate is <inline-formula><mml:math><mml:mi>k</mml:mi></mml:math></inline-formula> here.</p>
+<disp-formula id="e1"><mml:math><mml:mi>J</mml:mi></mml:math></disp-formula>
+<table-wrap><caption><p>Table 1 Data</p></caption><table><tr><td>1.0</td></tr></table></table-wrap>
+<fig><caption><p>Fig. 1 Scheme of the setup.</p></caption></fig>
+</sec>
+</body>
+<back><ref-list><ref>Smith J. Membranes 2020.</ref></ref-list></back>
+</article>
+"""
+
+
+def _write_pdf(path, pages):
+    """글자만 있는 최소 PDF를 만든다(Helvetica, 쪽마다 여러 줄)."""
+    objs = ["<< /Type /Catalog /Pages 2 0 R >>", None]
+    kids = []
+    for lines in pages:
+        stream = (
+            "BT /F1 10 Tf 50 750 Td 12 TL "
+            + " ".join(
+                "(" + ln.replace("(", r"\(").replace(")", r"\)") + ") '" for ln in lines
+            )
+            + " ET"
+        )
+        objs.append(f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream")
+        content_id = len(objs)
+        objs.append(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            f"/Contents {content_id} 0 R /Resources << /Font << /F1 FONT 0 R >> >> >>"
+        )
+        kids.append(len(objs))
+    objs.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    font_id = len(objs)
+    objs[1] = (
+        f"<< /Type /Pages /Kids [{' '.join(f'{k} 0 R' for k in kids)}] /Count {len(kids)} >>"
+    )
+    objs = [o.replace("FONT", str(font_id)) for o in objs]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for i, o in enumerate(objs, start=1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{o}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{off:010d} 00000 n \n".encode() for off in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    path.write_bytes(out)
+
+
+def test_jats_kinds_and_exclusions(tmp_path):
+    p = tmp_path / "paper.xml"
+    p.write_text(JATS, encoding="utf-8")
+    doc = load(p)
+    kinds = {s.kind for s in doc.segments}
+    assert {SegmentKind.BODY, SegmentKind.HEADING, SegmentKind.FORMULA} <= kinds
+    assert {SegmentKind.TABLE, SegmentKind.CAPTION, SegmentKind.REFERENCE} <= kinds
+    body = doc.text()
+    assert "Graphical abstract" not in body  # 그래픽 초록 제외
+    assert "CO2 capture" in body  # 아래첨자는 글자로 이어 붙인다
+    assert FORMULA_PLACEHOLDER in body  # 문단 안 수식은 자리표시자
+    assert (
+        "Smith" not in body and "Fig. 1" not in body
+    )  # 참고문헌·그림 설명은 본문이 아님
+    assert doc.status == ProcessingStatus.COMPLETED
+
+
+def test_pdf_korean_filename_headers_and_references(tmp_path):
+    header = "Membranes 2021, 11, 175"
+    pages = [
+        [
+            header,
+            *(f"Page {n} line {k}: {FILLER.strip()}" for k in range(8)),
+            f"{n} of 4",
+        ]
+        for n in range(1, 4)
+    ] + [[header, "References", "1. Smith J. Membranes 2020.", "4 of 4"]]
+    p = tmp_path / "한글 논문.pdf"
+    _write_pdf(p, pages)
+    doc = load(p, "pypdf")
+    assert doc.pages_total == 4
+    assert header not in doc.text()  # 반복 머리글 제외
+    assert "Smith" not in doc.text()
+    assert "Smith" in doc.text(SegmentKind.REFERENCE)
+    assert doc.status == ProcessingStatus.COMPLETED
+
+
+def test_status_too_short_out_of_scope_failed(tmp_path):
+    short = tmp_path / "short.xml"
+    short.write_text(JATS.replace(FILLER * 30, ""), encoding="utf-8")
+    assert load(short).status == ProcessingStatus.TOO_SHORT
+
+    # 한국어 본문에 영어 단어(참고문헌 등)가 섞여도 범위 밖으로 걸러야 한다
+    korean = tmp_path / "ko.xml"
+    korean.write_text(
+        JATS.replace(
+            FILLER * 30, "막을 반응기에서 시험했고 물의 투과량을 측정했다. " * 200
+        ),
+        encoding="utf-8",
+    )
+    assert load(korean).status == ProcessingStatus.OUT_OF_SCOPE
+
+    bad_xml = tmp_path / "bad.xml"
+    bad_xml.write_text("<article><body>", encoding="utf-8")
+    assert load(bad_xml).status == ProcessingStatus.EXTRACTION_FAILED
+
+    empty = tmp_path / "empty.pdf"
+    _write_pdf(empty, [[""]])
+    assert load(empty, "pypdf").status == ProcessingStatus.EXTRACTION_FAILED
+
+    broken = tmp_path / "broken.pdf"
+    broken.write_bytes(b"not a pdf")
+    assert load(broken, "pypdf").status == ProcessingStatus.EXTRACTION_FAILED
+
+    other = tmp_path / "paper.docx"
+    other.write_bytes(b"PK")
+    assert load(other).status == ProcessingStatus.OUT_OF_SCOPE
+
+
+def _fake_pages(monkeypatch, pages):
+    monkeypatch.setattr(ingest, "_pdf_pages", lambda path, engine: pages)
+
+
+def test_partial_when_a_page_fails(tmp_path, monkeypatch):
+    good = "\n".join(f"Line {k}: {FILLER.strip()}" for k in range(20))
+    _fake_pages(monkeypatch, [good, None, good])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    doc = load(p)
+    assert doc.status == ProcessingStatus.PARTIAL
+    assert doc.pages_failed == [2]
+
+
+def test_pdf_location_maps_back_to_raw_lines(tmp_path, monkeypatch):
+    fi = chr(0xE103)  # RSC 글꼴에서 fi가 이 문자로 나온다
+    page = "\n".join(
+        [f"The modi {fi}cation of the surface was con {fi}rmed by FTIR."]
+        + [f"Line {k}: {FILLER.strip()}" for k in range(30)]
+    )
+    _fake_pages(monkeypatch, [page])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    doc = load(p)
+    seg = next(s for s in doc.segments if "modification" in s.text)
+    assert "confirmed" in seg.text  # 분석용 사본은 복구됨
+    raw = source_text(doc, seg)
+    assert raw is not None and fi in raw  # 원문 위치로 돌아가면 깨진 글자 그대로
+    assert seg.loc.startswith("p1:L0-")
+
+
+def test_jats_location_resolves(tmp_path):
+    p = tmp_path / "paper.xml"
+    p.write_text(JATS, encoding="utf-8")
+    doc = load(p)
+    for seg in doc.segments:
+        el = resolve_jats(p, seg.loc)
+        assert el is not None, seg.loc
+    first_body = next(
+        s
+        for s in doc.segments
+        if s.section == "1. Introduction" and s.kind == SegmentKind.BODY
+    )
+    assert first_body.loc == "body[1]/sec[1]/p[1]"
+
+
+def test_paragraphs_hyphen_caption_and_sentence_breaks():
+    lines = [
+        "The adsorp-",
+        "tion was fast.",
+        "Fig. 2 shows the flux.",
+        "Fig. 3 SEM images of the membrane.",
+        "Next sentence",
+        "continues here.",
+    ]
+    paras = _paragraphs(list(enumerate(lines)))
+    assert paras[0] == ("The adsorption was fast.", 0, 1)
+    assert paras[1][0] == "Fig. 2 shows the flux."  # 본문 문장(소문자 동사)
+    assert paras[2][0].startswith("Fig. 3 SEM")
+    assert paras[3] == ("Next sentence continues here.", 4, 5)
+
+
+def test_repair_glyphs_only_when_signature_present():
+    fi = chr(0xE103)
+    text, n = _repair_glyphs(f"con {fi}rming at 3440 cm /C0 1")
+    assert text == "confirming at 3440 cm \u2212 1" and n == 2
+    clean = "A normal sentence with \u00bc cup."
+    assert _repair_glyphs(clean) == (clean, 0)
+
+
+def test_repeated_body_line_is_kept(tmp_path):
+    # 쪽 가운데에 같은 문장이 반복돼도 머리글로 보고 지우지 않는다
+    same = "The same sentence appears in the middle of every page here."
+    pages = [["Head", f"Intro {n}.", same, same, f"End {n}.", "Foot"] for n in range(4)]
+    p = tmp_path / "rep.pdf"
+    _write_pdf(p, pages)
+    assert load(p, "pypdf").text().count(same) >= 4
+
+
+def test_review_manuscript_line_numbers_removed(tmp_path):
+    pages = [
+        [f"{n * 20 + k + 1} Line {k} of page {n}: {FILLER.strip()}" for k in range(20)]
+        for n in range(3)
+    ]
+    p = tmp_path / "manuscript.pdf"
+    _write_pdf(p, pages)
+    doc = load(p, "pypdf")
+    assert "줄 번호" in " ".join(doc.issues)
+    assert not any(s.text[:1].isdigit() for s in doc.segments)
+    assert doc.status == ProcessingStatus.COMPLETED
+
+
+def test_numbered_references_and_tables_are_not_line_numbers():
+    refs = []
+    for k in range(1, 8):
+        refs += [f"{k} A. Author, B. Author, J. Membr. Sci., 2019,", "512, 100-110."]
+    assert _strip_line_numbers(refs) == (refs, False)
+    table = [
+        f"{v} 0.{v} 1.{v}" for v in (25, 50, 75, 100, 150, 200, 250, 300, 350, 400)
+    ]
+    assert _strip_line_numbers(table) == (table, False)
+
+
+def test_page_numbers_removed_but_numeric_rows_kept(tmp_path):
+    pages = [
+        [
+            f"Body text on page {n} about the reactor design and flux.",
+            "Results were stable.",
+            "42",
+            str(n + 1),
+        ]
+        for n in range(4)
+    ]
+    p = tmp_path / "pn.pdf"
+    _write_pdf(p, pages)
+    doc = load(p, "pypdf")
+    body = doc.text()
+    assert "42" in body  # 쪽 번호 규칙(쪽 순서 + 상수)에 맞지 않는 숫자 줄은 남긴다
+    assert not any(s.text == "2" for s in doc.segments)
+
+
+def test_running_lines_need_repetition():
+    pages = [
+        ["Journal 2021, 11, 1", "text a", "1 of 3"],
+        ["Journal 2021, 11, 2", "text b", "2 of 3"],
+    ]
+    assert _running_lines(pages) == set()  # 3쪽 미만이면 판단하지 않는다
+
+
+def test_summary_and_cli_never_print_text(tmp_path, capsys):
+    p = tmp_path / "paper.xml"
+    p.write_text(JATS, encoding="utf-8")
+    doc = load(p)
+    dumped = json.dumps(summarize(doc), ensure_ascii=False)
+    for s in doc.segments:
+        if len(s.text) > 20:
+            assert s.text not in dumped
+    out_path = tmp_path / "segments.json"
+    assert main(["ingest", str(p), "--out", str(out_path)]) == 0
+    printed = capsys.readouterr().out
+    assert "membrane process" not in printed
+    assert "membrane process" in out_path.read_text(encoding="utf-8")
+
+
+def test_cli_refuses_to_overwrite_input(tmp_path):
+    p = tmp_path / "paper.xml"
+    p.write_text(JATS, encoding="utf-8")
+    assert main(["ingest", str(p), "--out", str(p)]) == 2
+    assert p.read_text(encoding="utf-8") == JATS

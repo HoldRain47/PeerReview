@@ -1,0 +1,562 @@
+"""입력 처리: 논문 파일에서 위치 정보가 붙은 구간 목록과 처리 상태를 만든다.
+
+근거: 개발 보고서 v2.0 4절(원본 보존, 추출 품질 확인, 구간 구분).
+원본 파일은 읽기만 한다. 요약(`summarize`)에는 원문을 넣지 않는다.
+비공개 원고에도 쓰이므로, 에이전트에게 전달할 출력은 요약뿐이어야 한다.
+
+위치 대응: 구간마다 `loc`을 남긴다. PDF는 `p<쪽>:L<시작>-<끝>`으로, 추출기가 낸 정규화 전
+쪽 글자의 줄 번호(0부터)를 가리킨다(`source_text`로 되찾는다). XML은 `body/sec[2]/p[3]` 같은
+요소 경로다(`resolve_jats`로 되찾는다).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import itertools
+import logging
+import re
+import unicodedata
+import xml.etree.ElementTree as ET
+from collections import Counter
+from dataclasses import dataclass, field
+from enum import StrEnum
+from pathlib import Path
+
+from peerreview.model import ProcessingStatus
+
+# 분량 부족 기준(본문 단어 수). 임시값이며 T003에서 길이별 결과를 보고 정한다(목표 정의서 6절).
+MIN_BODY_WORDS = 300
+# 영어 판별 임시값: 본문 낱말 중 흔한 영어 기능어 비율의 하한, 라틴 문자가 아닌 낱말 비율의 상한.
+MIN_ENGLISH_STOPWORD_RATIO = 0.15
+MAX_NON_LATIN_RATIO = 0.3
+FORMULA_PLACEHOLDER = "[FORMULA]"
+
+_STOPWORDS = frozenset(
+    {"the", "of", "and", "to", "in", "a", "is", "that", "for", "with", "as", "by", "on"}
+    | {
+        "are",
+        "this",
+        "was",
+        "be",
+        "from",
+        "at",
+        "an",
+        "or",
+        "which",
+        "were",
+        "it",
+        "can",
+    }
+)
+_REFERENCE_HEADING = re.compile(
+    r"^\s*(\d+\.?\s*)?(references|bibliography|literature cited|참고\s*문헌)\s*$",
+    re.IGNORECASE,
+)
+_WORD = re.compile(r"[A-Za-z][A-Za-z\-']*")
+_LETTERS = re.compile(r"[^\W\d_]+")  # 모든 문자 체계의 낱말
+
+
+class SegmentKind(StrEnum):
+    """구간 종류. 판정 분석은 BODY만 쓰고 나머지는 미평가 영역으로 남긴다."""
+
+    HEADING = "heading"
+    BODY = "body"
+    FORMULA = "formula"
+    TABLE = "table"
+    CAPTION = "caption"
+    REFERENCE = "reference"
+
+
+@dataclass
+class Segment:
+    kind: SegmentKind
+    text: str  # 분석용으로 정규화한 글자
+    order: int  # 문서 안 순서
+    section: str = ""  # 소속 절 제목(XML) 또는 빈 값
+    page: int | None = None  # 1부터. XML이면 None
+    loc: str = ""  # 원문 위치(모듈 설명 참고)
+
+
+@dataclass
+class Document:
+    path: Path
+    sha256: str
+    fmt: str  # "jats" | "pdf"
+    engine: str
+    segments: list[Segment] = field(default_factory=list)
+    pages_total: int | None = None
+    pages_failed: list[int] = field(default_factory=list)
+    status: ProcessingStatus = ProcessingStatus.COMPLETED
+    issues: list[str] = field(default_factory=list)
+    # PDF 추출기가 낸 정규화 전 쪽별 줄. 위치 대응용이며 요약·저장에 넣지 않는다.
+    raw_lines: list[list[str] | None] = field(default_factory=list, repr=False)
+
+    def text(self, kind: SegmentKind = SegmentKind.BODY) -> str:
+        return "\n\n".join(s.text for s in self.segments if s.kind == kind)
+
+
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def words(text: str) -> list[str]:
+    """영어 낱말. 수식 자리표시자는 세지 않는다."""
+    return _WORD.findall(text.replace(FORMULA_PLACEHOLDER, " "))
+
+
+# ---------------------------------------------------------------- JATS XML
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _jats_text(el: ET.Element) -> str:
+    """요소의 글자를 모은다. 수식은 자리표시자로 바꾸고, 각주 번호 같은 xref도 그대로 둔다."""
+    parts: list[str] = []
+
+    def walk(e: ET.Element) -> None:
+        name = _local(e.tag)
+        if name in ("inline-formula", "disp-formula", "math"):
+            parts.append(f" {FORMULA_PLACEHOLDER} ")
+        elif name in ("table-wrap", "fig", "list") and e is not el:
+            pass  # 문단 안의 표·그림·목록은 따로 구간으로 만든다
+        else:
+            if e.text:
+                parts.append(e.text)
+            for c in e:
+                walk(c)
+        if e is not el and e.tail:
+            parts.append(e.tail)
+
+    walk(el)
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
+def _child_paths(parent: ET.Element, parent_path: str) -> list[tuple[ET.Element, str]]:
+    """자식마다 `이름[같은 이름 중 순번]` 경로를 붙인다(순번은 1부터)."""
+    seen: Counter[str] = Counter()
+    out = []
+    for c in parent:
+        name = _local(c.tag)
+        seen[name] += 1
+        prefix = f"{parent_path}/" if parent_path else ""
+        out.append((c, f"{prefix}{name}[{seen[name]}]"))
+    return out
+
+
+def resolve_jats(xml_path: Path, loc: str) -> ET.Element | None:
+    """`loc` 경로가 가리키는 XML 요소를 되찾는다."""
+    el: ET.Element | None = ET.parse(xml_path).getroot()
+    for step in loc.split("/"):
+        m = re.fullmatch(r"([\w-]+)\[(\d+)\]", step)
+        if el is None or not m:
+            return None
+        same = [c for c in el if _local(c.tag) == m.group(1)]
+        idx = int(m.group(2)) - 1
+        el = same[idx] if idx < len(same) else None
+    return el
+
+
+def load_jats(path: Path) -> Document:
+    doc = Document(path=path, sha256=file_sha256(path), fmt="jats", engine="xml")
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as e:
+        doc.issues.append(f"XML을 읽지 못함: 줄 {e.position[0]}")
+        doc.status = ProcessingStatus.EXTRACTION_FAILED
+        return doc
+
+    def add(kind: SegmentKind, text: str, section: str, loc: str) -> None:
+        if text:
+            doc.segments.append(
+                Segment(kind, text, len(doc.segments), section, loc=loc)
+            )
+
+    def add_inner(el: ET.Element, loc: str, section: str) -> None:
+        """문단 안에 들어 있는 표·그림·목록을 따로 구간으로 만든다."""
+        for c, cpath in _child_paths(el, loc):
+            name = _local(c.tag)
+            if name == "table-wrap":
+                add(SegmentKind.TABLE, _jats_text(c), section, cpath)
+            elif name == "fig":
+                add(SegmentKind.CAPTION, _jats_text(c), section, cpath)
+            elif name == "list":
+                for li, lpath in _child_paths(c, cpath):
+                    if _local(li.tag) == "list-item":
+                        add(SegmentKind.BODY, _jats_text(li), section, lpath)
+            else:
+                add_inner(c, cpath, section)
+
+    def walk_sec(sec: ET.Element, sec_path: str, title: str) -> None:
+        for c, cpath in _child_paths(sec, sec_path):
+            name = _local(c.tag)
+            if name == "title":
+                title = _jats_text(c)
+                add(SegmentKind.HEADING, title, title, cpath)
+            elif name in ("p", "disp-quote"):
+                add(SegmentKind.BODY, _jats_text(c), title, cpath)
+                add_inner(c, cpath, title)
+            elif name in ("list", "def-list"):
+                for li, lpath in _child_paths(c, cpath):
+                    add(SegmentKind.BODY, _jats_text(li), title, lpath)
+            elif name == "disp-formula":
+                add(SegmentKind.FORMULA, FORMULA_PLACEHOLDER, title, cpath)
+            elif name in ("table-wrap", "table-wrap-group"):
+                add(SegmentKind.TABLE, _jats_text(c), title, cpath)
+            elif name == "fig":
+                add(SegmentKind.CAPTION, _jats_text(c), title, cpath)
+            elif name == "ref-list":
+                add_refs(c, cpath)
+            elif name == "sec":
+                walk_sec(c, cpath, title)
+
+    def add_refs(ref_list: ET.Element, loc: str) -> None:
+        for r, rpath in _child_paths(ref_list, loc):
+            if _local(r.tag) == "ref":
+                add(SegmentKind.REFERENCE, _jats_text(r), "References", rpath)
+
+    for el, path_ in _child_paths(root, ""):
+        if _local(el.tag) == "front":
+            for ab in el.iter("abstract"):
+                if ab.get("abstract-type") not in (None, "", "abstract"):
+                    continue  # 그래픽 초록 등
+                for p in ab.iter("p"):
+                    add(
+                        SegmentKind.BODY,
+                        _jats_text(p),
+                        "Abstract",
+                        _find_path(el, p, path_),
+                    )
+        elif _local(el.tag) == "body":
+            walk_sec(el, path_, "")
+        elif _local(el.tag) == "back":
+            for c, cpath in _child_paths(el, path_):
+                if _local(c.tag) == "ref-list":
+                    add_refs(c, cpath)
+    return assess(doc)
+
+
+def _find_path(base: ET.Element, target: ET.Element, base_path: str) -> str:
+    """`base` 아래에서 `target`까지의 요소 경로를 찾는다."""
+    for c, cpath in _child_paths(base, base_path):
+        if c is target:
+            return cpath
+        found = _find_path(c, target, cpath)
+        if found:
+            return found
+    return ""
+
+
+# ---------------------------------------------------------------- PDF
+
+PDF_ENGINES = ("pypdf", "pdfplumber")
+# pdfplumber가 같은 단어로 묶는 글자 간격(pt). 기본값 3은 양쪽 정렬 문단에서 띄어쓰기를 잃는다.
+PDFPLUMBER_X_TOLERANCE = 1.5
+
+
+def _pdf_pages(path: Path, engine: str) -> list[str | None]:
+    """페이지별 글자. 실패한 페이지는 None. 파일 자체를 열지 못하면 예외를 낸다."""
+    pages: list[str | None] = []
+    if engine == "pypdf":
+        from pypdf import PdfReader
+
+        # 글꼴 경고(fontTools 권고 등)는 결과에 영향이 없고 화면만 어지럽힌다
+        logging.getLogger("pypdf").setLevel(logging.ERROR)
+        reader = PdfReader(path)
+        for idx in range(len(reader.pages)):
+            try:
+                pages.append(reader.pages[idx].extract_text() or "")
+            except Exception:  # noqa: BLE001 - 페이지 하나의 실패를 기록하고 계속한다
+                pages.append(None)
+    elif engine == "pdfplumber":
+        import pdfplumber
+
+        with pdfplumber.open(path) as pdf:
+            for page in pdf.pages:
+                try:
+                    pages.append(
+                        page.extract_text(x_tolerance=PDFPLUMBER_X_TOLERANCE) or ""
+                    )
+                except Exception:  # noqa: BLE001
+                    pages.append(None)
+    else:
+        raise ValueError(f"알 수 없는 엔진: {engine}")
+    return pages
+
+
+# 그림·표 설명 시작 줄. "Fig. 1 FTIR …", "Figure 2. Schematic …", "Table 3 (a) …"
+# 번호 뒤가 소문자면("Fig. 2 shows") 본문 문장이므로 제외한다.
+_CAPTION = re.compile(r"^(Fig\.?|Figure|Scheme|Table)\s*\d+[.:]?\s+[A-Z(]")
+# 출판사 전용 글꼴(예: RSC의 AdvOT 계열)에서 잘못 추출되는 글자. 시험한 PDF에서 확인한 것만 넣는다.
+# 깨짐 흔적이 있는 문서에서는 진짜 ¼도 "="로 바뀌는 한계가 있다.
+_LIGATURE_REPAIR = {"": "fi", "": "fl", "": "ft"}
+_SYMBOL_REPAIR = {"/C0": "−", "/C14": "°", "¼": "="}  # 빼기, 도, 등호
+_GLYPH_SIGNATURE = re.compile("[-]|/C0|/C14")
+
+
+def _repair_glyphs(text: str) -> tuple[str, int]:
+    """알려진 글꼴 깨짐을 고친다. 깨짐 흔적이 없는 문서는 건드리지 않는다. 줄 수는 바꾸지 않는다."""
+    if not _GLYPH_SIGNATURE.search(text):
+        return text, 0
+    n = 0
+    for bad, good in _LIGATURE_REPAIR.items():
+        # 합자 앞뒤에 끼어든 띄어쓰기도 지운다: "con rming" -> "confirming"
+        text, k = re.subn(rf"(?<=[A-Za-z]) ?{bad} ?(?=[a-z])", good, text)
+        n += k + text.count(bad)
+        text = text.replace(bad, good)
+    for bad, good in _SYMBOL_REPAIR.items():
+        n += text.count(bad)
+        text = text.replace(bad, good)
+    return text, n
+
+
+_LINE_NUMBER = re.compile(r"^\s*(\d{1,4})\s+(?=\S)")
+
+
+def _strip_line_numbers(lines: list[str]) -> tuple[list[str], bool]:
+    """심사용 원고의 줄 번호를 지운다.
+
+    쪽의 70% 이상이 숫자로 시작하고, 그 숫자가 대부분(80%) 1씩 늘어날 때만 줄 번호로 본다.
+    번호 매긴 참고문헌(여러 줄 항목)이나 숫자 표는 이 조건을 만족하지 않는다.
+    """
+    filled = [x for x in lines if x.strip()]
+    if len(filled) < 10:
+        return lines, False
+    nums = [int(m.group(1)) for x in filled if (m := _LINE_NUMBER.match(x))]
+    if len(nums) < 0.7 * len(filled):
+        return lines, False
+    steps = sum(b - a == 1 for a, b in itertools.pairwise(nums))
+    if steps < 0.8 * (len(nums) - 1):
+        return lines, False
+    return [_LINE_NUMBER.sub("", x) for x in lines], True
+
+
+def _norm_line(line: str) -> str:
+    """머리글·바닥글 비교용: 숫자와 공백을 지운다."""
+    return re.sub(r"\s+", "", re.sub(r"\d", "", line)).lower()
+
+
+def _edge(lines: list[str]) -> list[int]:
+    """쪽의 맨 위·맨 아래 비어 있지 않은 줄 두 개씩의 위치."""
+    filled = [j for j, x in enumerate(lines) if x.strip()]
+    return sorted(set(filled[:2] + filled[-2:]))
+
+
+def _running_lines(pages: list[list[str]]) -> set[str]:
+    """여러 쪽 가장자리에 반복되는 줄(머리글·바닥글). 숫자만 있는 줄은 여기서 다루지 않는다."""
+    if len(pages) < 3:
+        return set()
+    counts: Counter[str] = Counter()
+    for lines in pages:
+        counts.update({_norm_line(lines[j]) for j in _edge(lines)} - {""})
+    return {k for k, n in counts.items() if n >= max(3, len(pages) // 2)}
+
+
+def _page_number_offset(pages: list[tuple[int, list[str]]]) -> int | None:
+    """가장자리의 숫자만 있는 줄이 '쪽 번호 = 쪽 순서 + 상수'를 3쪽 이상에서 따르면 그 상수."""
+    offsets: Counter[int] = Counter()
+    for i, lines in pages:
+        for j in _edge(lines):
+            if re.fullmatch(r"\s*\d{1,4}\s*", lines[j]):
+                offsets[int(lines[j]) - i] += 1
+    if not offsets:
+        return None
+    off, n = offsets.most_common(1)[0]
+    return off if n >= 3 else None
+
+
+def _paragraphs(lines: list[tuple[int, str]]) -> list[tuple[str, int, int]]:
+    """(줄 위치, 줄) 목록을 문단 (글자, 시작 줄, 끝 줄)로 묶는다.
+
+    빈 줄, 문장 끝 뒤 대문자로 시작하는 줄, 그림·표 설명 시작 줄을 경계로 본다. 줄 끝 하이픈은 잇는다.
+    """
+    out: list[tuple[str, int, int]] = []
+    cur, start, end = "", -1, -1
+    for j, raw in lines:
+        line = raw.strip()
+        if not line:
+            if cur:
+                out.append((cur, start, end))
+            cur = ""
+            continue
+        sentence_end = re.search(r"[.:?!]$", cur) and re.match(r"[A-Z0-9(\[]", line)
+        if cur and (_CAPTION.match(line) or sentence_end):
+            out.append((cur, start, end))
+            cur, start = line, j
+        elif cur.endswith("-") and re.match(r"[a-z]", line):
+            cur = cur[:-1] + line
+        elif cur:
+            cur = f"{cur} {line}"
+        else:
+            cur, start = line, j
+        end = j
+    if cur:
+        out.append((cur, start, end))
+    return out
+
+
+def _add_paragraphs(
+    doc: Document, lines: list[tuple[int, str]], kind: SegmentKind, page: int
+) -> None:
+    for para, start, end in _paragraphs(lines):
+        k = kind
+        if kind == SegmentKind.BODY and (m := _CAPTION.match(para)):
+            k = SegmentKind.TABLE if m.group(1) == "Table" else SegmentKind.CAPTION
+        doc.segments.append(
+            Segment(
+                k, para, len(doc.segments), page=page, loc=f"p{page}:L{start}-{end}"
+            )
+        )
+
+
+def source_text(doc: Document, seg: Segment) -> str | None:
+    """PDF 구간의 정규화 전 원문 줄을 되찾는다."""
+    m = re.fullmatch(r"p(\d+):L(\d+)-(\d+)", seg.loc)
+    if not m or doc.fmt != "pdf":
+        return None
+    raw = doc.raw_lines[int(m.group(1)) - 1]
+    if raw is None:
+        return None
+    return "\n".join(raw[int(m.group(2)) : int(m.group(3)) + 1])
+
+
+def _split_lines(text: str) -> list[str]:
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
+def load_pdf(path: Path, engine: str = "pypdf") -> Document:
+    doc = Document(path=path, sha256=file_sha256(path), fmt="pdf", engine=engine)
+    try:
+        raw = _pdf_pages(path, engine)
+    except Exception as e:  # noqa: BLE001 - 파일 전체를 열지 못한 경우
+        doc.issues.append(f"PDF를 열지 못함: {type(e).__name__}")
+        doc.status = ProcessingStatus.EXTRACTION_FAILED
+        return doc
+    doc.pages_total = len(raw)
+    doc.raw_lines = [None if t is None else _split_lines(t) for t in raw]
+
+    # 분석용 사본: 글꼴 깨짐 복구와 NFKC(합자 ﬁ 등 풀기). 줄 수는 그대로 두어 위치 대응을 지킨다.
+    page_lines: list[list[str] | None] = []
+    repaired = numbered = 0
+    for t in raw:
+        if t is None:
+            page_lines.append(None)
+            continue
+        fixed, n = _repair_glyphs(t)
+        repaired += n
+        lines = _split_lines(unicodedata.normalize("NFKC", fixed))
+        if len(lines) != len(_split_lines(t)):
+            doc.issues.append("정규화 후 줄 수가 달라져 위치 대응이 어긋날 수 있음")
+        lines, hit = _strip_line_numbers(lines)
+        numbered += hit
+        page_lines.append(lines)
+    if repaired:
+        doc.issues.append(f"글꼴 깨짐 문자 {repaired}곳을 알려진 규칙으로 복구함")
+    if numbered:
+        doc.issues.append(f"줄 번호를 {numbered}쪽에서 지움")
+
+    ok_pages = [(i, ls) for i, ls in enumerate(page_lines, start=1) if ls]
+    running = _running_lines([ls for _, ls in ok_pages])
+    page_offset = _page_number_offset(ok_pages)
+    if running or page_offset is not None:
+        doc.issues.append(
+            f"반복 머리글·바닥글 {len(running)}종과 쪽 번호를 본문에서 제외함"
+        )
+
+    in_refs = False
+    for i, lines in enumerate(page_lines, start=1):
+        if lines is None:
+            doc.pages_failed.append(i)
+            continue
+        edge = set(_edge(lines))
+        block: list[tuple[int, str]] = []
+        for j, line in enumerate(lines):
+            if j in edge and (
+                _norm_line(line) in running
+                or (page_offset is not None and line.strip() == str(i + page_offset))
+            ):
+                continue
+            if not in_refs and _REFERENCE_HEADING.match(line):
+                _add_paragraphs(doc, block, SegmentKind.BODY, i)
+                block = []
+                doc.segments.append(
+                    Segment(
+                        SegmentKind.HEADING,
+                        line.strip(),
+                        len(doc.segments),
+                        page=i,
+                        loc=f"p{i}:L{j}-{j}",
+                    )
+                )
+                in_refs = True
+                continue
+            block.append((j, line))
+        _add_paragraphs(
+            doc, block, SegmentKind.REFERENCE if in_refs else SegmentKind.BODY, i
+        )
+    if not in_refs:
+        doc.issues.append("참고문헌 시작을 찾지 못함: 참고문헌이 본문에 섞였을 수 있음")
+    return assess(doc)
+
+
+# ---------------------------------------------------------------- 공통
+
+
+def assess(doc: Document) -> Document:
+    """처리 상태를 정한다. 증거 수준과는 별개다."""
+    if doc.status == ProcessingStatus.EXTRACTION_FAILED:
+        return doc
+    body = doc.text().replace(FORMULA_PLACEHOLDER, " ")
+    tokens = _LETTERS.findall(body)
+    if not tokens:
+        doc.status = ProcessingStatus.EXTRACTION_FAILED
+        doc.issues.append("본문 글자를 추출하지 못함(스캔 PDF일 수 있음)")
+        return doc
+    non_latin = sum(not t.isascii() for t in tokens) / len(tokens)
+    stop_ratio = sum(t.lower() in _STOPWORDS for t in tokens) / len(tokens)
+    if non_latin > MAX_NON_LATIN_RATIO or stop_ratio < MIN_ENGLISH_STOPWORD_RATIO:
+        doc.status = ProcessingStatus.OUT_OF_SCOPE
+        doc.issues.append(
+            f"영어 본문으로 보기 어려움(기능어 비율 {stop_ratio:.2f}, 비라틴 낱말 비율 {non_latin:.2f})"
+        )
+    elif len(words(body)) < MIN_BODY_WORDS:
+        doc.status = ProcessingStatus.TOO_SHORT
+    elif doc.pages_failed:
+        doc.status = ProcessingStatus.PARTIAL
+    else:
+        doc.status = ProcessingStatus.COMPLETED
+    return doc
+
+
+def load(path: Path, engine: str | None = None) -> Document:
+    suffix = path.suffix.lower()
+    if suffix == ".xml":
+        return load_jats(path)
+    if suffix == ".pdf":
+        return load_pdf(path, engine or "pypdf")
+    doc = Document(path=path, sha256=file_sha256(path), fmt=suffix, engine="")
+    doc.status = ProcessingStatus.OUT_OF_SCOPE
+    doc.issues.append(f"지원하지 않는 형식: {suffix}")
+    return doc
+
+
+def summarize(doc: Document) -> dict:
+    """원문이 없는 집계. 비공개 원고의 결과도 이 요약만 공유한다."""
+    kinds = Counter(s.kind.value for s in doc.segments)
+    return {
+        "file_sha256": doc.sha256[:16],
+        "format": doc.fmt,
+        "engine": doc.engine,
+        "status": doc.status.value,
+        "pages_total": doc.pages_total,
+        "pages_failed": doc.pages_failed,
+        "segments": dict(sorted(kinds.items())),
+        "body_words": len(words(doc.text())),
+        "formula_placeholders": doc.text().count(FORMULA_PLACEHOLDER),
+        "issues": doc.issues,
+    }
