@@ -26,6 +26,11 @@
 - 결과: 제공 자료 5개가 디스크에서 삭제됐다. 백업 브랜치 backup/pre-public-20261003에서 작업 폴더로 복구했고, git hash-object로 5개 모두 일치함을 확인했다.
 - 재발 방지: 지침만. 이력에서 추적 파일을 뺄 때는 실행 전에 작업 폴더 밖으로 사본을 만든다. 또 pre-tool-guard는 명령 인자 안의 문장(커밋 메시지, heredoc)에 들어간 명령 이름에도 반응하므로, 기록에 그 이름을 쓸 때는 파일 편집 도구를 쓴다.
 
+### E002 사용자 이메일을 외부 API에 전송 (T002.1)
+- 원인: Crossref API 권장 관행(mailto 매개변수)을 따르면서 사용자 승인 없이 이메일 주소를 넣었다.
+- 결과: Crossref에 5건 요청이 이메일과 함께 전송됐다. 이후 조회에서는 뺐다.
+- 재발 방지: 지침만. 외부 API에 사용자 식별 정보(이메일 등)를 넣을 때는 먼저 묻는다.
+
 ## 2026-10-03 T000 프로젝트 세팅
 - 결과: HarnessKit v26092612 전체 수준(Claude Code·Codex) 설치, git init, uv 패키지 골격과 판정 어휘(model.py) 작성, 제공 자료를 docs/source/로 이동.
 - 증거: `uv run pytest -q` 3 passed, `uv run ruff check .` 통과, verify.py 불일치 없음, stop-check.sh 종료 코드 0.
@@ -45,3 +50,8 @@
 - 결과: 목표정의서·라벨지침 v26100302를 사용자가 승인. L07·L13은 지침 그대로 유지.
 - 증거: 사용자 응답(대화). 문서 본문의 "초안" 표기는 다음 개정 때 고친다.
 - 남은 것: 라벨 일관성은 T002.8에서 확인.
+
+## 2026-10-03 T002.1 자료 출처와 이용 조건 조사 [review]
+- 결과: docs/자료출처조사.md 작성. 주 출처는 Europe PMC 경유 CC BY JATS XML(RSC Advances·Membranes), MDPI Processes는 내려받기 방법 확인 후 추가, ChemRxiv는 PDF 시험용.
+- 증거: Europe PMC·Crossref API 조회값(2026-10-03), XML 1편 구조 확인. MDPI·ChemRxiv 자동 조회 403. 사용자 이메일 전송 오류 E002.
+- 남은 것: 사용자 승인, 화학공학 주제 범위 기준(T002.4).
