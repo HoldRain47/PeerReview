@@ -1,4 +1,4 @@
-<!-- harness-kit: AGENTS.md v26100301 | updated 2026-10-03 21:37 KST -->
+<!-- harness-kit: AGENTS.md v26100302 | updated 2026-10-03 22:06 KST -->
 # PeerReview 에이전트 지침
 
 이 파일은 모든 코딩 에이전트(Claude Code, Codex CLI, Gemini CLI)가 읽는 프로젝트 지침의 원본이다. 150줄 이내의 목차로 유지하고, 가끔 필요한 절차는 `.agents/skills/`로 옮긴다. 공통 규칙은 사용자 전역 지침(HarnessKit core/COMMON_RULES.md)을 따르며 이 파일에 다시 쓰지 않는다.
@@ -6,7 +6,7 @@
 ## 1. 프로젝트
 - 목적: 제출된 논문의 작성 과정에 생성형 AI가 관여했는지 근거에 따라 판단하고, 판단·근거·한계를 리뷰로 전달한다. 개발 기준은 `docs/source/논문_AI관여판단_프로그램개발보고서_v2.0-최종.docx`.
 - 범위 밖: 저자의 고의·정책 위반·부정행위 확정, 신호 부재를 AI 미사용 확인으로 표시, 검증하지 않은 점수를 관여 확률로 출력.
-- 하네스 수준: 전체 / Git: 사용(로컬 저장소, 원격 없음) (결정 기록: `.agents/state/STATE.json`)
+- 하네스 수준: 전체 / Git: 사용(원격 GitHub public `HoldRain47/PeerReview`, `main`만 push. `docs/source/`·`data/`는 올리지 않는다) (결정 기록: `.agents/state/STATE.json`)
 
 ## 2. 기술 스택과 명령
 - 언어·런타임: Python 3.14, uv, pytest, ruff
@@ -14,6 +14,9 @@
 - 실행: `uv run peerreview`
 - 시험: `uv run pytest -q` (종료 검사 훅이 쓰는 명령은 `.agents/hooks/stop-check.conf`의 CHECK_COMMAND)
 - 린트·형식: `uv run ruff check .` / `uv run ruff format .`
+- 운영 환경: Windows 10/11에서 반드시 실행된다(Mac은 개발용). GUI 우선, Windows 호환 문제가 있으면 CLI. 사용자 PC에 Python과 uv를 설치해 실행한다.
+- Windows 호환: 파일 입출력에 `encoding="utf-8"`을 명시한다(한국어 Windows 기본값 cp949). 경로는 `pathlib`, 한글 파일명과 CRLF를 시험한다. 의존성은 Windows용 wheel이 있는 것만 쓴다.
+- Windows 확인: CI(`.github/workflows/ci.yml`, windows-latest)는 보조다. 최종 확인은 사용자가 준비한 Windows 10 환경에서 한다.
 
 ## 3. 세션 시작과 종료
 - 시작: `.agents/state/STATE.json`의 `current.next_action`과 `git log -5`를 먼저 읽는다(session-resume 스킬). 전체 기록을 다시 읽지 않는다.
