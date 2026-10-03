@@ -1,0 +1,325 @@
+{
+  "files": {
+    ".agents/hooks/pre-tool-guard.sh": {
+      "source": "hooks/pre-tool-guard.sh",
+      "version": "v26092611",
+      "sha256": "6f42361f25779199c658ba1f1627a9136424a59e7e5e09a20035f8cabed8677c"
+    },
+    ".agents/hooks/stop-check.sh": {
+      "source": "hooks/stop-check.sh",
+      "version": "v26092612",
+      "sha256": "57fcafeb340d48498baa118dceb63b000f11c130ac303a9934ffe05390fd9b8f"
+    },
+    ".agents/hooks/session-start.sh": {
+      "source": "hooks/session-start.sh",
+      "version": "v26092610",
+      "sha256": "06aa32a5956e1fc01af4596733bde3bccf3f166ffe80a6d104606b58a35ad928"
+    },
+    ".agents/skills/harness-start/SKILL.md": {
+      "source": "skills/harness-start/SKILL.md",
+      "version": "v26092611",
+      "sha256": "9f65a082ae8ce00f6561f41cb2b5888f31431f4e4acca7d1783f19ccfa6450fe"
+    },
+    ".agents/skills/session-resume/SKILL.md": {
+      "source": "skills/session-resume/SKILL.md",
+      "version": "v26092601",
+      "sha256": "bc143389daa139b0118059a26adbb9c931311049ddeb24b353a7b152c7fbd317"
+    },
+    ".agents/skills/session-handover/SKILL.md": {
+      "source": "skills/session-handover/SKILL.md",
+      "version": "v26092601",
+      "sha256": "d52f5df030da1465801421f48faf52a615b842349723a331781b0e02130f187f"
+    },
+    ".agents/skills/version-bump/SKILL.md": {
+      "source": "skills/version-bump/SKILL.md",
+      "version": "v26092611",
+      "sha256": "28274b7fcfae7f01f803b56940cba06077e5f37f0856e4845a2b61d0c5d055cb"
+    },
+    ".agents/skills/git-commit/SKILL.md": {
+      "source": "skills/git-commit/SKILL.md",
+      "version": "v26092601",
+      "sha256": "11af4f5f5c0634e38698cbe1b45154e9a69c11522862c94745520d980d4929f5"
+    },
+    ".agents/skills/context-engineering/SKILL.md": {
+      "source": "third_party/skills/context-engineering/SKILL.md",
+      "version": "vendored",
+      "sha256": "8b736cb9e55b82b265ab6ff78349c0e826e8a6df550deddf665b7fb3ff858b63"
+    },
+    ".agents/skills/context-engineering/LICENSE": {
+      "source": "third_party/licenses/agent-skills-LICENSE",
+      "version": "vendored",
+      "sha256": "6f202f8bd568cd730dbb2b0d1f8e243bc74c2fa1f64dbce9b2c7ea08bd5c9fd7"
+    },
+    ".agents/skills/planning-and-task-breakdown/SKILL.md": {
+      "source": "third_party/skills/planning-and-task-breakdown/SKILL.md",
+      "version": "vendored",
+      "sha256": "ed0f90cc5951ddd4bcab7f871f64efec93a49af9279ef93bc470da77ad8da3f7"
+    },
+    ".agents/skills/planning-and-task-breakdown/LICENSE": {
+      "source": "third_party/licenses/agent-skills-LICENSE",
+      "version": "vendored",
+      "sha256": "6f202f8bd568cd730dbb2b0d1f8e243bc74c2fa1f64dbce9b2c7ea08bd5c9fd7"
+    },
+    ".agents/skills/systematic-debugging/CREATION-LOG.md": {
+      "source": "third_party/skills/systematic-debugging/CREATION-LOG.md",
+      "version": "vendored",
+      "sha256": "c24733a5b1821bd6bed1fc950261f0b9f4e90097e0bbb96459d8179713730789"
+    },
+    ".agents/skills/systematic-debugging/SKILL.md": {
+      "source": "third_party/skills/systematic-debugging/SKILL.md",
+      "version": "vendored",
+      "sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787"
+    },
+    ".agents/skills/systematic-debugging/condition-based-waiting-example.ts": {
+      "source": "third_party/skills/systematic-debugging/condition-based-waiting-example.ts",
+      "version": "vendored",
+      "sha256": "40ae5ebe497fdf310200e43fe986552546d0a22837c0d39e855db1cfd33eb88e"
+    },
+    ".agents/skills/systematic-debugging/condition-based-waiting.md": {
+      "source": "third_party/skills/systematic-debugging/condition-based-waiting.md",
+      "version": "vendored",
+      "sha256": "e89fec8400d6cd50f43407cec9fab50976ba4d55d0ec2eb51c0bd68036b54c26"
+    },
+    ".agents/skills/systematic-debugging/defense-in-depth.md": {
+      "source": "third_party/skills/systematic-debugging/defense-in-depth.md",
+      "version": "vendored",
+      "sha256": "1e175fb86fc357e58c6aebf5441e481e1b7868b4380c0456b63a17eefbd18ba7"
+    },
+    ".agents/skills/systematic-debugging/find-polluter.sh": {
+      "source": "third_party/skills/systematic-debugging/find-polluter.sh",
+      "version": "vendored",
+      "sha256": "dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c"
+    },
+    ".agents/skills/systematic-debugging/root-cause-tracing.md": {
+      "source": "third_party/skills/systematic-debugging/root-cause-tracing.md",
+      "version": "vendored",
+      "sha256": "75b933b6a8c40bdb2031b10f21654395b56ec6ab6bc7b018c18d3fe57aeb7fb8"
+    },
+    ".agents/skills/systematic-debugging/test-academic.md": {
+      "source": "third_party/skills/systematic-debugging/test-academic.md",
+      "version": "vendored",
+      "sha256": "fe2ba480d78ac0d686dc025f41c2a32a43d642bf533f91b0c6053a04d35d6486"
+    },
+    ".agents/skills/systematic-debugging/test-pressure-1.md": {
+      "source": "third_party/skills/systematic-debugging/test-pressure-1.md",
+      "version": "vendored",
+      "sha256": "0b6a915db0054577819834c79be9eb614e97bddba10d73768e1fbe91cfed048a"
+    },
+    ".agents/skills/systematic-debugging/test-pressure-2.md": {
+      "source": "third_party/skills/systematic-debugging/test-pressure-2.md",
+      "version": "vendored",
+      "sha256": "b2030aeffba07050e8ad573ddf87486457c4a016a786bb326235bebd856f2016"
+    },
+    ".agents/skills/systematic-debugging/test-pressure-3.md": {
+      "source": "third_party/skills/systematic-debugging/test-pressure-3.md",
+      "version": "vendored",
+      "sha256": "96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708"
+    },
+    ".agents/skills/systematic-debugging/LICENSE": {
+      "source": "third_party/licenses/superpowers-LICENSE",
+      "version": "vendored",
+      "sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400"
+    },
+    ".agents/skills/verification-before-completion/SKILL.md": {
+      "source": "third_party/skills/verification-before-completion/SKILL.md",
+      "version": "vendored",
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3"
+    },
+    ".agents/skills/verification-before-completion/LICENSE": {
+      "source": "third_party/licenses/superpowers-LICENSE",
+      "version": "vendored",
+      "sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400"
+    },
+    ".claude/settings.json": {
+      "source": "project/.claude/settings.json",
+      "version": "v26092612",
+      "sha256": "b66bf3820d5446cd9535d06e98fba203935da6a95a1cfaddf7f5631cf1eda9fc"
+    },
+    ".claude/skills/harness-start/SKILL.md": {
+      "source": "skills/harness-start/SKILL.md",
+      "version": "v26092611",
+      "sha256": "9f65a082ae8ce00f6561f41cb2b5888f31431f4e4acca7d1783f19ccfa6450fe"
+    },
+    ".claude/skills/session-resume/SKILL.md": {
+      "source": "skills/session-resume/SKILL.md",
+      "version": "v26092601",
+      "sha256": "bc143389daa139b0118059a26adbb9c931311049ddeb24b353a7b152c7fbd317"
+    },
+    ".claude/skills/session-handover/SKILL.md": {
+      "source": "skills/session-handover/SKILL.md",
+      "version": "v26092601",
+      "sha256": "d52f5df030da1465801421f48faf52a615b842349723a331781b0e02130f187f"
+    },
+    ".claude/skills/version-bump/SKILL.md": {
+      "source": "skills/version-bump/SKILL.md",
+      "version": "v26092611",
+      "sha256": "28274b7fcfae7f01f803b56940cba06077e5f37f0856e4845a2b61d0c5d055cb"
+    },
+    ".claude/skills/git-commit/SKILL.md": {
+      "source": "skills/git-commit/SKILL.md",
+      "version": "v26092601",
+      "sha256": "11af4f5f5c0634e38698cbe1b45154e9a69c11522862c94745520d980d4929f5"
+    },
+    ".claude/skills/context-engineering/SKILL.md": {
+      "source": "third_party/skills/context-engineering/SKILL.md",
+      "version": "vendored",
+      "sha256": "8b736cb9e55b82b265ab6ff78349c0e826e8a6df550deddf665b7fb3ff858b63"
+    },
+    ".claude/skills/context-engineering/LICENSE": {
+      "source": "third_party/licenses/agent-skills-LICENSE",
+      "version": "vendored",
+      "sha256": "6f202f8bd568cd730dbb2b0d1f8e243bc74c2fa1f64dbce9b2c7ea08bd5c9fd7"
+    },
+    ".claude/skills/planning-and-task-breakdown/SKILL.md": {
+      "source": "third_party/skills/planning-and-task-breakdown/SKILL.md",
+      "version": "vendored",
+      "sha256": "ed0f90cc5951ddd4bcab7f871f64efec93a49af9279ef93bc470da77ad8da3f7"
+    },
+    ".claude/skills/planning-and-task-breakdown/LICENSE": {
+      "source": "third_party/licenses/agent-skills-LICENSE",
+      "version": "vendored",
+      "sha256": "6f202f8bd568cd730dbb2b0d1f8e243bc74c2fa1f64dbce9b2c7ea08bd5c9fd7"
+    },
+    ".claude/skills/systematic-debugging/CREATION-LOG.md": {
+      "source": "third_party/skills/systematic-debugging/CREATION-LOG.md",
+      "version": "vendored",
+      "sha256": "c24733a5b1821bd6bed1fc950261f0b9f4e90097e0bbb96459d8179713730789"
+    },
+    ".claude/skills/systematic-debugging/SKILL.md": {
+      "source": "third_party/skills/systematic-debugging/SKILL.md",
+      "version": "vendored",
+      "sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787"
+    },
+    ".claude/skills/systematic-debugging/condition-based-waiting-example.ts": {
+      "source": "third_party/skills/systematic-debugging/condition-based-waiting-example.ts",
+      "version": "vendored",
+      "sha256": "40ae5ebe497fdf310200e43fe986552546d0a22837c0d39e855db1cfd33eb88e"
+    },
+    ".claude/skills/systematic-debugging/condition-based-waiting.md": {
+      "source": "third_party/skills/systematic-debugging/condition-based-waiting.md",
+      "version": "vendored",
+      "sha256": "e89fec8400d6cd50f43407cec9fab50976ba4d55d0ec2eb51c0bd68036b54c26"
+    },
+    ".claude/skills/systematic-debugging/defense-in-depth.md": {
+      "source": "third_party/skills/systematic-debugging/defense-in-depth.md",
+      "version": "vendored",
+      "sha256": "1e175fb86fc357e58c6aebf5441e481e1b7868b4380c0456b63a17eefbd18ba7"
+    },
+    ".claude/skills/systematic-debugging/find-polluter.sh": {
+      "source": "third_party/skills/systematic-debugging/find-polluter.sh",
+      "version": "vendored",
+      "sha256": "dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c"
+    },
+    ".claude/skills/systematic-debugging/root-cause-tracing.md": {
+      "source": "third_party/skills/systematic-debugging/root-cause-tracing.md",
+      "version": "vendored",
+      "sha256": "75b933b6a8c40bdb2031b10f21654395b56ec6ab6bc7b018c18d3fe57aeb7fb8"
+    },
+    ".claude/skills/systematic-debugging/test-academic.md": {
+      "source": "third_party/skills/systematic-debugging/test-academic.md",
+      "version": "vendored",
+      "sha256": "fe2ba480d78ac0d686dc025f41c2a32a43d642bf533f91b0c6053a04d35d6486"
+    },
+    ".claude/skills/systematic-debugging/test-pressure-1.md": {
+      "source": "third_party/skills/systematic-debugging/test-pressure-1.md",
+      "version": "vendored",
+      "sha256": "0b6a915db0054577819834c79be9eb614e97bddba10d73768e1fbe91cfed048a"
+    },
+    ".claude/skills/systematic-debugging/test-pressure-2.md": {
+      "source": "third_party/skills/systematic-debugging/test-pressure-2.md",
+      "version": "vendored",
+      "sha256": "b2030aeffba07050e8ad573ddf87486457c4a016a786bb326235bebd856f2016"
+    },
+    ".claude/skills/systematic-debugging/test-pressure-3.md": {
+      "source": "third_party/skills/systematic-debugging/test-pressure-3.md",
+      "version": "vendored",
+      "sha256": "96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708"
+    },
+    ".claude/skills/systematic-debugging/LICENSE": {
+      "source": "third_party/licenses/superpowers-LICENSE",
+      "version": "vendored",
+      "sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400"
+    },
+    ".claude/skills/verification-before-completion/SKILL.md": {
+      "source": "third_party/skills/verification-before-completion/SKILL.md",
+      "version": "vendored",
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3"
+    },
+    ".claude/skills/verification-before-completion/LICENSE": {
+      "source": "third_party/licenses/superpowers-LICENSE",
+      "version": "vendored",
+      "sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400"
+    },
+    ".claude/agents/verifier.md": {
+      "source": "project/.claude/agents/verifier.md",
+      "version": "v26092611",
+      "sha256": "044c289861c58a0a271b8a12d9c2654dbdf485157674453f792c29f5033d8047"
+    },
+    ".codex/hooks.json": {
+      "source": "project/.codex/hooks.json",
+      "version": "v26092612",
+      "sha256": "962b03363a2fd2a1f29154574d61cc49ae2d632c363394a374d8c3cb3a92d71b"
+    },
+    ".codex/agents/verifier.toml": {
+      "source": "project/.codex/agents/verifier.toml",
+      "version": "v26092611",
+      "sha256": "6b3985d1c6057817f643733a2ba89a7018dc8fad61d978517e0bd4b05c9e4f23"
+    },
+    ".githooks/commit-msg": {
+      "source": "project/.githooks/commit-msg",
+      "version": "v26092608",
+      "sha256": "be0269387e76ab6025150a05db122fdbf9928b8f39245d8185a8a4a6c4d3ea89"
+    },
+    ".githooks/pre-commit": {
+      "source": "project/.githooks/pre-commit",
+      "version": "v26092608",
+      "sha256": "35508315418d2c40580196c84e7c3031e1b9103506946e5434598119c350b727"
+    }
+  },
+  "vendored": [
+    ".agents/skills/context-engineering/LICENSE",
+    ".agents/skills/context-engineering/SKILL.md",
+    ".agents/skills/planning-and-task-breakdown/LICENSE",
+    ".agents/skills/planning-and-task-breakdown/SKILL.md",
+    ".agents/skills/systematic-debugging/CREATION-LOG.md",
+    ".agents/skills/systematic-debugging/LICENSE",
+    ".agents/skills/systematic-debugging/SKILL.md",
+    ".agents/skills/systematic-debugging/condition-based-waiting-example.ts",
+    ".agents/skills/systematic-debugging/condition-based-waiting.md",
+    ".agents/skills/systematic-debugging/defense-in-depth.md",
+    ".agents/skills/systematic-debugging/find-polluter.sh",
+    ".agents/skills/systematic-debugging/root-cause-tracing.md",
+    ".agents/skills/systematic-debugging/test-academic.md",
+    ".agents/skills/systematic-debugging/test-pressure-1.md",
+    ".agents/skills/systematic-debugging/test-pressure-2.md",
+    ".agents/skills/systematic-debugging/test-pressure-3.md",
+    ".agents/skills/verification-before-completion/LICENSE",
+    ".agents/skills/verification-before-completion/SKILL.md",
+    ".claude/skills/context-engineering/LICENSE",
+    ".claude/skills/context-engineering/SKILL.md",
+    ".claude/skills/planning-and-task-breakdown/LICENSE",
+    ".claude/skills/planning-and-task-breakdown/SKILL.md",
+    ".claude/skills/systematic-debugging/CREATION-LOG.md",
+    ".claude/skills/systematic-debugging/LICENSE",
+    ".claude/skills/systematic-debugging/SKILL.md",
+    ".claude/skills/systematic-debugging/condition-based-waiting-example.ts",
+    ".claude/skills/systematic-debugging/condition-based-waiting.md",
+    ".claude/skills/systematic-debugging/defense-in-depth.md",
+    ".claude/skills/systematic-debugging/find-polluter.sh",
+    ".claude/skills/systematic-debugging/root-cause-tracing.md",
+    ".claude/skills/systematic-debugging/test-academic.md",
+    ".claude/skills/systematic-debugging/test-pressure-1.md",
+    ".claude/skills/systematic-debugging/test-pressure-2.md",
+    ".claude/skills/systematic-debugging/test-pressure-3.md",
+    ".claude/skills/verification-before-completion/LICENSE",
+    ".claude/skills/verification-before-completion/SKILL.md"
+  ],
+  "kit_version": "v26092612",
+  "installed_at": "2026-10-03 21:12 KST",
+  "level": "full",
+  "tools": [
+    "claude",
+    "codex"
+  ],
+  "kit_home_hint": "~/.agents/harness-kit"
+}

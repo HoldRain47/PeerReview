@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# harness-kit: .githooks/pre-commit v26092608 | updated 2026-09-27 00:36 KST
+# Git pre-commit 훅. 추가 대기(staged) 변경에서 비밀값 패턴과 대소문자만 다른 경로 충돌을 찾는다.
+# gitleaks가 설치되어 있으면 gitleaks를 먼저 실행한다. 없으면 기본 패턴으로 검사한다.
+# 설치: git config core.hooksPath .githooks
+set -uo pipefail
+FAIL=0
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner >&2 || FAIL=1
+else
+  PATTERNS='(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|(password|passwd|secret|api[_-]?key|token)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}["'"'"'])'
+  HITS="$(git diff --cached -U0 --no-color | grep -E '^\+[^+]' | grep -Ein -- "$PATTERNS" | head -n 5)"
+  if [ -n "$HITS" ]; then
+    echo "pre-commit: 비밀값으로 보이는 내용이 추가 대기 변경에 있습니다(앞 5건, 값 일부):" >&2
+    printf '%s\n' "$HITS" | cut -c1-80 >&2
+    FAIL=1
+  fi
+fi
+# 대소문자만 다른 경로(대소문자를 구분하지 않는 파일 시스템에서 서로 덮어쓴다)
+# 이번에 추가 대기한 파일이 관련된 충돌만 알린다(이미 있던 충돌로 모든 커밋을 막지 않는다).
+STAGED_LC="$(git -c core.quotePath=off diff --cached --name-only --diff-filter=AR | tr '[:upper:]' '[:lower:]')"
+DUP=""
+if [ -n "$STAGED_LC" ]; then
+  DUP="$(git -c core.quotePath=off ls-files | tr '[:upper:]' '[:lower:]' | sort | uniq -d | grep -Fx -f <(printf '%s\n' "$STAGED_LC") | head -n 5)"
+fi
+if [ -n "$DUP" ]; then
+  echo "pre-commit: 대소문자만 다른 경로가 있습니다: $DUP" >&2
+  FAIL=1
+fi
+[ "$FAIL" = 1 ] && { echo "pre-commit: 커밋을 중단했습니다. 잘못 잡힌 경우 사용자에게 확인한 뒤 해당 줄을 수정하세요(--no-verify 금지)." >&2; exit 1; }
+exit 0

@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'd=\"${GEMINI_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; while [ ! -x \"$d/.agents/hooks/pre-tool-guard.sh\" ] && [ \"$d\" != / ] && [ \"$d\" != . ]; do d=\"$(dirname \"$d\")\"; done; [ -x \"$d/.agents/hooks/pre-tool-guard.sh\" ] && exec \"$d/.agents/hooks/pre-tool-guard.sh\"; echo \"pre-tool-guard.sh 를 찾지 못해 명령을 막습니다(.agents/hooks 확인)\" >&2; exit 2'",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'd=\"${GEMINI_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; while [ ! -x \"$d/.agents/hooks/stop-check.sh\" ] && [ \"$d\" != / ] && [ \"$d\" != . ]; do d=\"$(dirname \"$d\")\"; done; [ -x \"$d/.agents/hooks/stop-check.sh\" ] && exec \"$d/.agents/hooks/stop-check.sh\"; echo \"stop-check.sh 를 찾지 못해 종료 검사를 건너뜁니다\" >&2; echo \"{}\"; exit 0'",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

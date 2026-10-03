@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+.DS_Store
+~$*
+# 원고·평가 자료는 기밀일 수 있으므로 저장소에 넣지 않는다 (보고서 10절)
+data/*
+!data/README.md

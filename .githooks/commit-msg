@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# harness-kit: .githooks/commit-msg v26092608 | updated 2026-09-27 00:36 KST
+# Git commit-msg 훅. 커밋 제목이 Conventional Commits 형식인지 검사한다.
+# 설치: git config core.hooksPath .githooks (저장소 로컬 설정. 전역 설정은 바꾸지 않는다)
+# 허용: <type>(<scope>)!: <요약>  / Merge·Revert·fixup!·squash! 자동 메시지
+set -uo pipefail
+MSG_FILE="$1"
+SUBJECT="$(grep -v '^#' "$MSG_FILE" | sed '/^[[:space:]]*$/d' | head -n 1)"
+TYPES='feat|fix|docs|refactor|test|chore|build|ci|perf|style|revert'
+if printf '%s' "$SUBJECT" | grep -Eq '^(Merge |Revert "|fixup! |squash! |amend! )'; then exit 0; fi
+if ! printf '%s' "$SUBJECT" | grep -Eq "^(${TYPES})(\([^)]+\))?!?: .+"; then
+  echo "commit-msg: 제목이 Conventional Commits 형식이 아닙니다: '$SUBJECT'" >&2
+  echo "  형식: <type>(<scope>): <요약>  type = ${TYPES//|/, }" >&2
+  exit 1
+fi
+LEN="$(printf '%s' "$SUBJECT" | wc -m | tr -d ' ')"
+if [ "$LEN" -gt 100 ]; then
+  echo "commit-msg: 제목이 ${LEN}자입니다. 100자 이내(권장 72자)로 줄이세요." >&2
+  exit 1
+fi
+exit 0
