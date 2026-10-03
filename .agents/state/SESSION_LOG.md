@@ -40,3 +40,8 @@
 - 결과: 분야를 Chemical Engineering으로 정정(문서 v26100302), T002 계획(tasks/plan.md), AGENTS.md에 공개 논문 외부 API 예외 추가. docs/source를 main 이력에서 빼고 .gitignore에 넣었다(공개 제외 결정). 운영 환경: Windows 10 필수, GUI 우선(CLI 허용), Python 설치형. Windows 10 시험 환경은 사용자가 준비한다.
 - 증거: main 이력의 docs/source 0건, 복구한 파일 5개 해시 일치. 오류 E001.
 - 남은 것: 사용자가 gh auth login을 하면 public 저장소를 만들어 main만 push, Windows CI 추가, 운영 환경을 AGENTS.md·목표 정의서에 기록.
+
+## 2026-10-03 T001 승인 [done]
+- 결과: 목표정의서·라벨지침 v26100302를 사용자가 승인. L07·L13은 지침 그대로 유지.
+- 증거: 사용자 응답(대화). 문서 본문의 "초안" 표기는 다음 개정 때 고친다.
+- 남은 것: 라벨 일관성은 T002.8에서 확인.

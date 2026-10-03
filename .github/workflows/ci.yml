@@ -1,4 +1,4 @@
-# harness-kit: .github/workflows/ci.yml v26100301 | updated 2026-10-03 KST
+# harness-kit: .github/workflows/ci.yml v26100302 | updated 2026-10-03 KST
 # Windows 호환 확인용 보조 시험. 원고·제공 자료는 저장소에 없으므로 가상 시험 자료만 쓴다.
 name: ci
 
@@ -15,8 +15,8 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
       - name: Install uv
