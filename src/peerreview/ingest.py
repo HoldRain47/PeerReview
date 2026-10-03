@@ -65,6 +65,8 @@ class SegmentKind(StrEnum):
     TABLE = "table"
     CAPTION = "caption"
     FIGURE_TEXT = "figure_text"  # 그림 안의 축 눈금·범례 등. PDF에서 문단처럼 뽑힌다
+    BACK_MATTER = "back_matter"  # 감사의 글, 저자 기여, 이해 상충, 기호표 등
+    FRONT_MATTER = "front_matter"  # 초록 앞의 학술지명·제목·저자·소속 등
     REFERENCE = "reference"
 
 
@@ -193,18 +195,24 @@ def load_jats(path: Path) -> Document:
             else:
                 add_inner(c, cpath, section)
 
-    def walk_sec(sec: ET.Element, sec_path: str, title: str) -> None:
+    def walk_sec(
+        sec: ET.Element, sec_path: str, title: str, back: bool = False
+    ) -> None:
+        """`back`이면 이 절의 본문을 BACK_MATTER로 둔다(감사의 글, 저자 기여, 기호표 등)."""
+        body_kind = SegmentKind.BACK_MATTER if back else SegmentKind.BODY
         for c, cpath in _child_paths(sec, sec_path):
             name = _local(c.tag)
             if name == "title":
                 title = _jats_text(c)
                 add(SegmentKind.HEADING, title, title, cpath)
+                if _is_named_heading(title) and _BACK_MATTER.search(title):
+                    body_kind = SegmentKind.BACK_MATTER
             elif name in ("p", "disp-quote"):
-                add(SegmentKind.BODY, _jats_text(c), title, cpath)
+                add(body_kind, _jats_text(c), title, cpath)
                 add_inner(c, cpath, title)
             elif name in ("list", "def-list"):
                 for li, lpath in _child_paths(c, cpath):
-                    add(SegmentKind.BODY, _jats_text(li), title, lpath)
+                    add(body_kind, _jats_text(li), title, lpath)
             elif name == "disp-formula":
                 add(SegmentKind.FORMULA, FORMULA_PLACEHOLDER, title, cpath)
             elif name in ("table-wrap", "table-wrap-group"):
@@ -214,7 +222,10 @@ def load_jats(path: Path) -> Document:
             elif name == "ref-list":
                 add_refs(c, cpath)
             elif name == "sec":
-                walk_sec(c, cpath, title)
+                is_back = body_kind == SegmentKind.BACK_MATTER
+                walk_sec(
+                    c, cpath, title, is_back or c.get("sec-type") in _BACK_SEC_TYPES
+                )
 
     def add_refs(ref_list: ET.Element, loc: str) -> None:
         for r, rpath in _child_paths(ref_list, loc):
@@ -297,6 +308,36 @@ _CAPTION = re.compile(
 )
 # 번호 붙은 수식 줄: 등호가 있고 "(7)"처럼 끝난다. 뒤에 "where …"가 같은 줄에 붙어 나오기도 한다.
 _EQUATION = re.compile(r"=.*\(\d{1,3}[a-z]?\)\s*$")
+# 절 제목 줄: "2.1 Materials", "3. Results and Discussion", "II. Methods"
+_SECTION_HEADING = re.compile(
+    r"^(\d{1,2}(\.\d{1,2}){0,3}\.?|[IVX]{1,4}\.)\s+[A-Z][^.!?]{0,80}$"
+)
+_NAMED_HEADING = re.compile(
+    r"^(abstract|introduction|conclusions?|results(\s+and\s+discussion)?|discussion"
+    r"|experimental(\s+section)?|materials\s+and\s+methods|methods|methodology|keywords?)\s*:?\s*$",
+    re.IGNORECASE,
+)
+# 논문 뒷부분 표지. 이 표지 뒤의 본문은 참고문헌 전까지 BACK_MATTER로 둔다.
+_BACK_MATTER = re.compile(
+    r"^(acknowledge?ments?|author\s+contributions?|credit\s+authorship|funding"
+    r"|conflicts?\s+of\s+interests?|declaration\s+of\s+competing\s+interests?"
+    r"|competing\s+interests?|data\s+availability(\s+statement)?"
+    r"|institutional\s+review\s+board\s+statement|informed\s+consent\s+statement"
+    r"|nomenclature|abbreviations|supplementary\s+materials?|supporting\s+information"
+    r"|footnotes|(research\s+|animal\s+)?ethics\s+statement|fieldwork\s+statement)\b",
+    re.IGNORECASE,
+)
+# JATS에서 뒷부분으로 보는 절 종류
+_BACK_SEC_TYPES = frozenset(
+    {
+        "glossary",
+        "ack",
+        "fn-group",
+        "associated-data",
+        "supplementary-materials",
+        "COI-statement",
+    }
+)
 _EQUATION_THEN_TEXT = re.compile(
     r"^(.*=.*?\(\d{1,3}[a-z]?\))\s+((?:where|in which|with|here)\b.*)$"
 )
@@ -392,10 +433,18 @@ def _paragraphs(lines: list[tuple[int, str]]) -> list[tuple[str, int, int]]:
             expanded += [(j, m.group(1)), (j, m.group(2))]
         else:
             expanded.append((j, raw))
-    for j, raw in expanded:
+    for idx, (j, raw) in enumerate(expanded):
         line = raw.strip()
-        if _is_equation_line(line):
-            # 수식 줄은 혼자 한 구간이 된다
+        nxt = next((x.strip() for _, x in expanded[idx + 1 :] if x.strip()), "")
+        # 절 제목은 다음 줄이 소문자로 이어지지 않을 때만 인정한다.
+        # 번호 목록 항목의 첫 줄("4. To increase the …" 다음 줄 "source, …")을 제목으로 떼어 내지 않기 위해서다.
+        # 이름 없는 번호 제목은 앞 줄이 문장 끝이거나 문단 시작일 때만 인정한다(남은 줄 번호 오인 방지).
+        prev_ok = (
+            not cur or bool(re.search(r"[.:?!;]$", cur)) or _is_named_heading(line)
+        )
+        heading = _is_heading_line(line) and not nxt[:1].islower() and prev_ok
+        if _is_equation_line(line) or heading:
+            # 수식 줄과 절 제목 줄은 혼자 한 구간이 된다
             if cur:
                 out.append((cur, start, end))
             out.append((line, j, j))
@@ -433,6 +482,8 @@ def _add_paragraphs(
                 k = SegmentKind.TABLE if is_table else SegmentKind.CAPTION
             elif start == end and _is_equation_line(para):
                 k = SegmentKind.FORMULA
+            elif start == end and _is_heading_line(para):
+                k = SegmentKind.HEADING
             elif _is_figure_text(para):
                 k = SegmentKind.FIGURE_TEXT
         doc.segments.append(
@@ -475,6 +526,115 @@ def _is_equation_line(line: str) -> bool:
         len(w) >= 4 and not w.isupper() and w.lower() not in _MATH_WORDS
         for w in words(line)
     )
+
+
+_FINITE_VERB = re.compile(
+    r"\b(is|are|was|were|has|have|had|be|been|can|could|may|will|would|shows?|showed)\b",
+    re.IGNORECASE,
+)
+_TRAILING_FUNCTION_WORD = re.compile(
+    r"\b(the|a|an|of|and|or|to|in|for|with|at|by|on|from)\s*$", re.IGNORECASE
+)
+
+
+def _is_named_heading(line: str) -> bool:
+    """이름 있는 절 제목("Introduction", "1. Introduction")이나 뒷부분 표지만 있는 줄."""
+    bare = re.sub(r"^(\d{1,2}(\.\d{1,2}){0,3}\.?|[IVX]{1,4}\.)\s+", "", line.strip())
+    if _NAMED_HEADING.match(bare):
+        return True
+    return bool(_BACK_MATTER.fullmatch(bare.rstrip(" :"))) or (
+        bool(_BACK_MATTER.match(bare))
+        and len(words(bare)) <= 4
+        and not re.search(r"[.;,]$", bare)
+    )
+
+
+def _is_heading_line(line: str) -> bool:
+    """절 제목 줄인지 판정한다.
+
+    이름 있는 제목은 그대로 인정한다. 번호 붙은 제목은 10단어 이하이고, 동사(were, is 등)가 없고,
+    관사·전치사로 끝나지 않고, 번호 뒤에 숫자 토큰이 2개 이상 없어야 한다.
+    "3 Results were obtained at 25 °C", 표 행 "2 Ethanol 78 79"를 제목으로 보지 않기 위해서다.
+    """
+    n = len(words(line))
+    if n == 0:
+        return False
+    if _is_named_heading(line):
+        return True
+    if n > 10 or not _SECTION_HEADING.match(line):
+        return False
+    rest = line.split(None, 1)[1] if len(line.split(None, 1)) > 1 else ""
+    numbers = sum(bool(_NUMBER_TOKEN.match(t)) for t in rest.split())
+    return not (
+        _FINITE_VERB.search(rest)
+        or _TRAILING_FUNCTION_WORD.search(rest)
+        or numbers >= 2
+    )
+
+
+def _mark_back_matter(doc: Document) -> int:
+    """뒷부분 표지가 나온 뒤 참고문헌 전까지의 본문을 BACK_MATTER로 바꾼다. 바꾼 수를 돌려준다."""
+    in_back, n = False, 0
+    for seg in doc.segments:
+        if seg.kind == SegmentKind.REFERENCE:
+            break
+        # 표지로 인정하는 것: 뒷부분 제목 줄("Acknowledgments")이나 "표지:" 형태의 문단("Funding: …").
+        # "Funding agencies increasingly require …" 같은 본문 문장은 표지가 아니다.
+        labeled = seg.kind == SegmentKind.BODY and bool(
+            _BACK_MATTER_LABEL.match(seg.text)
+        )
+        if (
+            seg.kind == SegmentKind.HEADING
+            and _is_named_heading(seg.text)
+            and _BACK_MATTER.search(seg.text)
+        ) or labeled:
+            in_back = True
+        elif seg.kind == SegmentKind.HEADING:
+            in_back = False  # 뒷부분이 아닌 제목이 나오면 본문으로 돌아간다
+        if in_back and seg.kind == SegmentKind.BODY:
+            seg.kind = SegmentKind.BACK_MATTER
+            n += 1
+    return n
+
+
+# 앞부분이 끝나는 표지: 제목 줄 "Abstract"·"1. Introduction", 또는 "Abstract:"로 시작하는 문단
+_ABSTRACT_LABEL = re.compile(r"^abstract\s*[:.\u2014\u2013-]", re.IGNORECASE)
+# 뒷부분 "표지:" 형태 문단
+_BACK_MATTER_LABEL = re.compile(_BACK_MATTER.pattern + r"[^:.]{0,40}:", re.IGNORECASE)
+
+
+def _mark_front_matter(doc: Document) -> int:
+    """초록·서론이 처음 3쪽 안에서 시작하면, 그 앞의 문장이 아닌 조각(제목·저자·소속)을 FRONT_MATTER로 바꾼다.
+
+    초록·서론을 찾았으면 1 이상(바꾼 수 + 1), 못 찾으면 0을 돌려준다.
+    """
+    first = next(
+        (
+            k
+            for k, seg in enumerate(doc.segments)
+            if (seg.page or 0) <= 3
+            and (
+                (seg.kind == SegmentKind.HEADING and _is_named_heading(seg.text))
+                or (seg.kind == SegmentKind.BODY and _ABSTRACT_LABEL.match(seg.text))
+            )
+        ),
+        None,
+    )
+    if first is None:
+        return 0
+    n = 0
+    for seg in doc.segments[:first]:
+        if seg.kind != SegmentKind.BODY:
+            continue
+        # 표지 없는 초록(RSC처럼 제목·저자와 한 덩어리이거나, 문장별로 쪼개진 경우)을 잃지 않도록
+        # 문장으로 보이는 구간(12단어 이상, 기능어 15% 이상, is·was 같은 동사 있음)은 본문에 남긴다.
+        alpha = words(seg.text)
+        stop = sum(w.lower() in _STOPWORDS for w in alpha) / max(len(alpha), 1)
+        if len(alpha) >= 12 and stop >= 0.15 and _FINITE_VERB.search(seg.text):
+            continue
+        seg.kind = SegmentKind.FRONT_MATTER
+        n += 1
+    return n + 1
 
 
 def _is_figure_text(para: str) -> bool:
@@ -596,6 +756,11 @@ def load_pdf(path: Path, engine: str = "pypdf") -> Document:
         )
     if not in_refs:
         doc.issues.append("참고문헌 시작을 찾지 못함: 참고문헌이 본문에 섞였을 수 있음")
+    _mark_back_matter(doc)
+    if not _mark_front_matter(doc):
+        doc.issues.append(
+            "초록·서론 시작을 찾지 못함: 제목·저자·소속이 본문에 섞였을 수 있음"
+        )
     return assess(doc)
 
 
@@ -676,6 +841,7 @@ def inspect(doc: Document) -> dict:
         )
         bins[key] += 1
     pages_with_body = {s.page for s in doc.segments if s.kind == SegmentKind.BODY}
+    eq = re.compile(r"=[^=]*\(\d{1,3}[a-z]?\)")
     return {
         "status": doc.status.value,
         "segments": dict(sorted(Counter(s.kind.value for s in doc.segments).items())),
@@ -692,6 +858,15 @@ def inspect(doc: Document) -> dict:
             for t in body
         ),
         "broken_glyphs_in_body": sum(broken_glyph_count(t) for t in body),
+        # 등호와 "(번호)"가 있는데 본문으로 남은 문단: 수식이 문장과 붙어 있을 가능성
+        "body_equation_like": sum(bool(eq.search(t)) for t in body),
+        "body_equation_like_with_broken_glyphs": sum(
+            bool(eq.search(t)) and broken_glyph_count(t) > 0 for t in body
+        ),
+        # 그 문단에서 수식으로 떼어 내지 못한 이유: 소문자 4글자 이상 낱말이 함께 있음
+        "body_equation_like_with_words": sum(
+            bool(eq.search(t)) and not _is_equation_line(t) for t in body
+        ),
         "pages_without_body": sorted(
             i for i in range(1, (doc.pages_total or 0) + 1) if i not in pages_with_body
         ),

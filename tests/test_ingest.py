@@ -12,6 +12,7 @@ from peerreview.ingest import (
     _repair_glyphs,
     _running_lines,
     _strip_line_numbers,
+    inspect,
     load,
     resolve_jats,
     source_text,
@@ -357,3 +358,103 @@ def test_inspect_reports_numbers_only(tmp_path, capsys):
         "200+",
     }
     assert "membrane" not in printed.lower()
+
+
+def test_headings_front_and_back_matter(tmp_path, monkeypatch):
+    body = [
+        f"Sentence {k} explains how the membrane was tested in the reactor."
+        for k in range(30)
+    ]
+    page1 = "\n".join(
+        [
+            "Journal of Membranes Article",
+            "University of Testing, Department of Chemical Engineering",
+            "Keywords: membrane; distillation; lithium",
+            "1. Introduction",
+            *body[:15],
+            "",
+            "2.1 Materials",
+            *body[15:],
+            "",
+            "4. To increase the attractiveness of the brines as an alternative",
+            "source, the process must be cheaper.",
+            "",
+            "Acknowledgments",
+            "We thank the laboratory staff for their help with the experiments.",
+            "Conflicts of Interest: The authors declare no conflict of interest.",
+            "References",
+            "1. Smith J. Membranes 2020.",
+        ]
+    )
+    _fake_pages(monkeypatch, [page1])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    doc = load(p)
+    by_start = {s.text[:20]: s.kind for s in doc.segments}
+    assert by_start["1. Introduction"] == SegmentKind.HEADING
+    assert by_start["2.1 Materials"] == SegmentKind.HEADING
+    assert by_start["Journal of Membranes"] == SegmentKind.FRONT_MATTER
+    # 번호 목록 항목 첫 줄은 다음 줄이 소문자로 이어지므로 제목이 아니다
+    assert by_start["4. To increase the a"] == SegmentKind.BODY
+    assert by_start["We thank the laborat"] == SegmentKind.BACK_MATTER
+    assert by_start["Conflicts of Interes"] == SegmentKind.BACK_MATTER
+    assert "laboratory staff" not in doc.text()
+
+
+def test_jats_back_matter_sections(tmp_path):
+    xml = JATS.replace(
+        "</body>",
+        "<sec><title>Author Contributions</title><p>A.B. wrote the paper.</p></sec>"
+        '<sec sec-type="glossary"><title>Symbols</title><p>J flux of water</p></sec></body>',
+    )
+    p = tmp_path / "paper.xml"
+    p.write_text(xml, encoding="utf-8")
+    doc = load(p)
+    assert "wrote the paper" in doc.text(SegmentKind.BACK_MATTER)
+    assert "flux of water" in doc.text(SegmentKind.BACK_MATTER)
+    assert "wrote the paper" not in doc.text()
+
+
+def test_inspect_equation_diagnostics(tmp_path, monkeypatch):
+    lines = [f"Line {k}: {FILLER.strip()}" for k in range(25)]
+    lines += ["", "The flux follows J = k (C1 - C2) as written in eqn (3)", ""]
+    _fake_pages(monkeypatch, ["\n".join(lines)])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    data = inspect(load(p))
+    assert data["body_equation_like"] == 1
+    assert data["body_equation_like_with_words"] == 1
+    assert data["body_equation_like_with_broken_glyphs"] == 0
+
+
+def test_body_sentences_are_not_markers(tmp_path, monkeypatch):
+    # 검증에서 지적된 경우: 표지처럼 시작하는 본문 문장, 숫자로 시작하는 본문 줄, 표 행
+    body = [
+        f"Sentence {k} explains how the membrane was tested in the reactor."
+        for k in range(20)
+    ]
+    page = "\n".join(
+        [
+            "Introduction of a catalyst increased the conversion of the feed in all runs.",
+            *body[:10],
+            "Funding agencies increasingly require that the data are shared openly.",
+            "3 Results were obtained at 25 \u00b0C for all samples.",
+            "2 Ethanol 78 79",
+            *body[10:],
+            "References",
+            "1. Smith J. Membranes 2020.",
+        ]
+    )
+    _fake_pages(monkeypatch, [page])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    doc = load(p)
+    text = doc.text()
+    assert "Introduction of a catalyst" in text  # 서론 표지로 오인해 앞을 자르지 않는다
+    assert "Funding agencies" in text  # 뒷부분 표지로 오인하지 않는다
+    assert "Sentence 19" in text  # 그 뒤 본문도 남는다
+    assert not any(
+        s.kind == SegmentKind.HEADING and s.text.startswith(("3 Results", "2 Ethanol"))
+        for s in doc.segments
+    )
+    assert not doc.text(SegmentKind.BACK_MATTER)

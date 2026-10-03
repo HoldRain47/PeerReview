@@ -70,3 +70,8 @@
 - 결과: 그림 안 글자(figure_text), 번호 붙은 수식 줄 분리, 깨진 글자 경고, 대문자 표 제목, 원문 없는 점검 명령 inspect 추가.
 - 증거: `uv run pytest -q` 22 passed, ruff 통과, 공개 5편 recall 변화 없음(0.850~0.995). verifier 회귀 지적 3건 반영. 오류 E003.
 - 남은 것: 비공개 원고 2차 실행 결과(숫자만), Windows 10 실기 확인, MDPI 뒷부분 절 제거.
+
+## 2026-10-04 T002.2 비공개 원고 2차 결과 반영 [review]
+- 결과: 절 제목(heading), 앞부분(front_matter), 뒷부분(back_matter: 감사의 글·저자 기여·기호표 등) 분리, inspect에 수식 진단 지표 추가. XML 정답에도 같은 뒷부분 분류 적용.
+- 증거: `uv run pytest -q` 26 passed, ruff 통과, 공개 5편 recall 0.848~0.993 유지, MDPI precision 0.545~0.713로 상승. verifier 지적 3건(본문 손실) 반영.
+- 남은 것: 비공개 원고 3차 실행(숫자만), 점검 1.
