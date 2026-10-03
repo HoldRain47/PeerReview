@@ -321,5 +321,6 @@
     "claude",
     "codex"
   ],
-  "kit_home_hint": "~/.agents/harness-kit"
+  "kit_home_hint": "~/.agents/harness-kit",
+  "relocked_at": "2026-10-03 21:37 KST"
 }
