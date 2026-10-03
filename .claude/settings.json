@@ -34,5 +34,15 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "deny": [
+      "Read(./data/private/**)",
+      "Read(./data/private)",
+      "Edit(./data/private/**)",
+      "Edit(./data/private)",
+      "Write(./data/private/**)",
+      "Write(./data/private)"
+    ]
   }
 }
