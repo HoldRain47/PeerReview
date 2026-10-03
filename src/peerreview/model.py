@@ -17,7 +17,20 @@ class InvolvementAct(StrEnum):
     MIXED = "mixed"  # 혼합 작성
     HUMAN_EDITED_AI = "human_edited_ai"  # AI 초안을 사람이 수정
     QUOTED_AI_OUTPUT = "quoted_ai_output"  # 연구 대상으로서의 AI 출력 인용
+    SEARCH_IDEATION = "search_ideation"  # 검색·아이디어 정리(원고 문장 산출 없음)
     UNKNOWN = "unknown"  # 미상
+
+
+# 1차 목표 행위 (목표 정의서 v26100301). 혼합 작성과 AI 초안의 사람 수정도
+# 생성이 포함되므로 목표 행위가 있는 것으로 보되, 결과는 행위별로 나눠 보고한다.
+TARGET_ACTS = frozenset(
+    {
+        InvolvementAct.GENERATION,
+        InvolvementAct.REWRITING,
+        InvolvementAct.MIXED,
+        InvolvementAct.HUMAN_EDITED_AI,
+    }
+)
 
 
 class EvidenceLevel(StrEnum):

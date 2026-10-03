@@ -12,19 +12,29 @@
         "pytest",
         "ruff"
       ],
-      "asked_at": "2026-10-03"
+      "asked_at": "2026-10-03",
+      "t001_scope": {
+        "language": "영어 원고",
+        "field": "공학·컴퓨터과학",
+        "target_acts": "본문 생성+재작성(혼합·AI 초안 사람 수정 포함)",
+        "doc_unit": "논문 전체(문단·문장 표시는 근거 위치 안내)",
+        "result_states": "model.py 증거 수준 5·처리 상태 5 유지, search_ideation 추가",
+        "acceptance_owner": "사용자",
+        "acceptance_when": "T002 자료 확보 후, 4단계 최종 시험 전",
+        "decided_at": "2026-10-03"
+      }
     }
   },
   "current": {
     "task_id": "T001",
     "title": "목표 정의서와 라벨 지침 작성",
-    "status": "todo",
+    "status": "review",
     "done_when": [
       "최초 지원 행위·언어·분야·문서 단위·결과 상태가 정해진 목표 정의서가 docs/에 있다",
       "교정·번역·재작성 경계 사례와 반례가 라벨 지침에 있다",
       "수용 기준(허용 오탐·재현율·유보율·처리량)의 결정 책임자와 시점이 적혀 있다"
     ],
-    "next_action": "사용자와 최초 지원 언어·분야·목표 행위를 정한다",
+    "next_action": "사용자가 docs/목표정의서-v26100301.md와 docs/라벨지침-v26100301.md를 검토한다. 승인되면 T001 done, T002 착수",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -44,11 +54,11 @@
     {
       "id": "T001",
       "title": "목표 정의서와 라벨 지침",
-      "status": "todo",
+      "status": "review",
       "done_when": [
         "8절 첫 단계 산출물 작성"
       ],
-      "evidence": "",
+      "evidence": "목표정의서·라벨지침 v26100301 작성(경계 사례 L01~L18). 라벨 일치도 시험 미실행. pytest 4 passed, ruff 통과",
       "commits": []
     },
     {

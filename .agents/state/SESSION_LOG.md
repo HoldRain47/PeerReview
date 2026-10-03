@@ -25,3 +25,8 @@
 - 결과: HarnessKit v26092612 전체 수준(Claude Code·Codex) 설치, git init, uv 패키지 골격과 판정 어휘(model.py) 작성, 제공 자료를 docs/source/로 이동.
 - 증거: `uv run pytest -q` 3 passed, `uv run ruff check .` 통과, verify.py 불일치 없음, stop-check.sh 종료 코드 0.
 - 남은 것: T001 목표 정의서. '제공 자료 나' v1.0 docx 미보유. 디스크 여유 9.5GiB.
+
+## 2026-10-03 T001 목표 정의서와 라벨 지침 [partial]
+- 결과: 제공 자료 나(계획검토보고서 v1.0) 커밋, 사용자 결정(영어·공학/CS·생성+재작성·논문 단위)으로 docs/목표정의서-v26100301.md, docs/라벨지침-v26100301.md 작성. model.py에 search_ideation과 TARGET_ACTS 추가.
+- 증거: `uv run pytest -q` 4 passed, `uv run ruff check .` 통과. 라벨 일치도 시험 미실행. v2.0의 '제공 자료 나 22쪽'은 docx 메타데이터(Pages=1, 템플릿 값)로 확인 못함.
+- 남은 것: 사용자 검토·승인. 미정: 리뷰 출력 언어, too_short 기준 길이, 분야 세부 경계, D 근거 기준일(T002).
