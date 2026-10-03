@@ -23,11 +23,35 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_ins.add_argument("file", type=Path)
     p_ins.add_argument("--engine", choices=["pypdf", "pdfplumber"], default=None)
+    p_lab = sub.add_parser(
+        "check-labels", help="라벨 파일(JSON Lines)의 형식과 판정 규칙을 검사한다"
+    )
+    p_lab.add_argument("file", type=Path)
     args = parser.parse_args(argv)
 
     # Windows 콘솔 인코딩에서 출력할 수 없는 글자가 있어도 멈추지 않게 한다.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="backslashreplace")
+
+    if args.command == "check-labels":
+        from collections import Counter
+
+        from peerreview.labels import derive_target, load_labels
+
+        records, errors = load_labels(args.file)
+        for e in errors:
+            print(e)
+        counts = Counter(derive_target(r).value for r in records)
+        print(
+            json.dumps(
+                {
+                    "records": len(records),
+                    "errors": len(errors),
+                    "target_present": counts,
+                }
+            )
+        )
+        return 1 if errors else 0
 
     from peerreview.ingest import inspect, load, summarize
 

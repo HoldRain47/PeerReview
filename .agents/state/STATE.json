@@ -48,17 +48,22 @@
         "agent_access": "차단(permissions.deny, guard.conf). 사용자가 직접 실행, 에이전트는 원문 없는 집계만",
         "label": "unknown, 근거 C(심사 의뢰 원고, 작성 경위 모름)",
         "decided_at": "2026-10-03"
+      },
+      "checkpoint1": {
+        "result": "진행",
+        "windows10_check": "프로그램이 더 갖춰진 뒤(예: T003 뒤)",
+        "decided_at": "2026-10-04"
       }
     }
   },
   "current": {
-    "task_id": "점검1",
-    "title": "점검 1: 자료 규모와 추출 품질 판단",
-    "status": "review",
+    "task_id": "T002.4",
+    "title": "사람 작성(D) 집단 수집과 자료 목록",
+    "status": "todo",
     "done_when": [
-      "출처별 이용 조건(주소·확인일)·형식·2022년 이전 규모·변형본 생성 허용 여부가 docs/자료출처조사.md에 있다"
+      "자료 목록에 문서마다 출처·이용 조건·해시·공개일·세부 분야가 있고 해시 검사 명령이 통과한다"
     ],
-    "next_action": "사용자가 점검 1 판단(진행 여부)과 Windows 10 실기 확인 시점을 정한다. 진행이면 T002.3 라벨 기록 형식",
+    "next_action": "사용자가 화학공학 범위·연도 범위를 정하면 Europe PMC 후보 메타데이터 수집부터 시작",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -109,11 +114,11 @@
     {
       "id": "T002.3",
       "title": "라벨 기록 형식과 검사",
-      "status": "todo",
+      "status": "done",
       "done_when": [
         "L01~L18 사례 시험이 지침 표와 같은 결과"
       ],
-      "evidence": "",
+      "evidence": "src/peerreview/labels.py(LabelRecord, derive_target, validate, JSONL), check-labels 명령. L01~L18 시험이 지침 표와 일치, pytest 52 passed. verifier 지적 3건 반영",
       "commits": []
     },
     {
@@ -182,5 +187,5 @@
     "unit": "",
     "note": ""
   },
-  "updated_at": "2026-10-04T00:57:18+09:00"
+  "updated_at": "2026-10-04T01:20:38+09:00"
 }
