@@ -97,8 +97,22 @@ def find_target(xml_path: Path, seed_id: str) -> Target | None:
     return None
 
 
+# 문장 끝으로 보지 않는 약어. 시범 작업 지시(2026-10-04)는 이 규칙 전에 만들어져 "et al." 뒤에서 잘린 것이 있다.
+_ABBREV = re.compile(
+    r"(?:\bet al|\be\.g|\bi\.e|\bFigs?|\bEqs?|\bRefs?|\bvs|\bca|\bapprox|\bNo)\.$",
+    re.IGNORECASE,
+)
+
+
 def split_sentences(paragraph: str) -> list[str]:
-    return [s for s in _SENTENCE_END.split(paragraph.strip()) if s]
+    """문장으로 나눈다. "et al.", "e.g.", "Fig." 같은 약어 뒤에서는 나누지 않는다."""
+    out: list[str] = []
+    for piece in _SENTENCE_END.split(paragraph.strip()):
+        if out and _ABBREV.search(out[-1]):
+            out[-1] = f"{out[-1]} {piece}"
+        elif piece:
+            out.append(piece)
+    return out
 
 
 def build_steps(act: InvolvementAct, t: Target) -> tuple[list[str], list[str]]:

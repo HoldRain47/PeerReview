@@ -113,3 +113,14 @@ def test_check_change_relabels_by_guideline():
     )  # 라벨 지침 5절: 구조·표현이 바뀌면 재작성
     rew = Task("v", "S", Act.REWRITING.value, "openai", [], ["l"])
     assert check_change(rew, orig, [PARA]).label_act == Act.PROOFREADING.value
+
+
+def test_split_sentences_keeps_abbreviations():
+    from peerreview.variants import split_sentences
+
+    text = "Merkel et al. reported high flux. Other work, e.g. Ref. 5, disagreed. See Fig. 2 for details."
+    assert split_sentences(text) == [
+        "Merkel et al. reported high flux.",
+        "Other work, e.g. Ref. 5, disagreed.",
+        "See Fig. 2 for details.",
+    ]

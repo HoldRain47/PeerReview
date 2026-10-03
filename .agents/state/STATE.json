@@ -59,18 +59,24 @@
         "years": "2017~2021",
         "journals": "RSC Advances, Membranes, ACS Omega(CC BY)",
         "decided_at": "2026-10-04"
+      },
+      "t002_5": {
+        "families": "Claude(하위 에이전트 Sonnet), OpenAI(API, 상한 1달러)",
+        "gemini": "제외",
+        "translation": "대용(영→한→영) 포함",
+        "decided_at": "2026-10-04"
       }
     }
   },
   "current": {
     "task_id": "T002.5",
     "title": "변형본 생성 프로토콜과 시범 생성",
-    "status": "todo",
+    "status": "in_progress",
     "done_when": [
       "행위별 시범 묶음 5개, 재분류가 의도와 일치",
       "생성 기록(모델·버전·입력문·시점·원출력)으로 변형본을 다시 대조할 수 있다"
     ],
-    "next_action": "사용자가 변형본 생성 모델·비용 한도·API 키 준비를 정한다",
+    "next_action": "사용자가 저장소 루트 .env에 OPENAI_API_KEY를 넣으면 models 조회 → 모델·가격 확인 → run-openai(상한 1달러) → build → 사용자 5건 확인",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -141,11 +147,11 @@
     {
       "id": "T002.5",
       "title": "변형본 생성 프로토콜과 시범 생성",
-      "status": "todo",
+      "status": "in_progress",
       "done_when": [
         "행위별 시범 묶음 5개, 재분류가 의도와 일치"
       ],
-      "evidence": "",
+      "evidence": "Claude 변형본 12개 생성·조립(라벨 변경 0, check-manifest·check-labels 오류 0). OpenAI 13개는 키 대기",
       "commits": []
     },
     {
