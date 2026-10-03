@@ -18,13 +18,26 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="원문이 들어간 전체 구간을 저장할 JSON 경로(로컬 확인용)",
     )
+    p_ins = sub.add_parser(
+        "inspect", help="추출 품질을 원문 없이 숫자로 점검한다(비공개 원고 확인용)"
+    )
+    p_ins.add_argument("file", type=Path)
+    p_ins.add_argument("--engine", choices=["pypdf", "pdfplumber"], default=None)
     args = parser.parse_args(argv)
 
     # Windows 콘솔 인코딩에서 출력할 수 없는 글자가 있어도 멈추지 않게 한다.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="backslashreplace")
 
-    from peerreview.ingest import load, summarize
+    from peerreview.ingest import inspect, load, summarize
+
+    if args.command == "inspect":
+        print(
+            json.dumps(
+                inspect(load(args.file, args.engine)), ensure_ascii=False, indent=1
+            )
+        )
+        return 0
 
     if args.out and args.out.resolve() == args.file.resolve():
         print(

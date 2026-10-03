@@ -64,6 +64,7 @@ class SegmentKind(StrEnum):
     FORMULA = "formula"
     TABLE = "table"
     CAPTION = "caption"
+    FIGURE_TEXT = "figure_text"  # 그림 안의 축 눈금·범례 등. PDF에서 문단처럼 뽑힌다
     REFERENCE = "reference"
 
 
@@ -291,7 +292,15 @@ def _pdf_pages(path: Path, engine: str) -> list[str | None]:
 
 # 그림·표 설명 시작 줄. "Fig. 1 FTIR …", "Figure 2. Schematic …", "Table 3 (a) …"
 # 번호 뒤가 소문자면("Fig. 2 shows") 본문 문장이므로 제외한다.
-_CAPTION = re.compile(r"^(Fig\.?|Figure|Scheme|Table)\s*\d+[.:]?\s+[A-Z(]")
+_CAPTION = re.compile(
+    r"^(Fig\.?|Figure|Scheme|Table|FIG\.?|FIGURE|SCHEME|TABLE)\s*(\d+|[IVX]+)[.:]?\s+[A-Z(]"
+)
+# 번호 붙은 수식 줄: 등호가 있고 "(7)"처럼 끝난다. 뒤에 "where …"가 같은 줄에 붙어 나오기도 한다.
+_EQUATION = re.compile(r"=.*\(\d{1,3}[a-z]?\)\s*$")
+_EQUATION_THEN_TEXT = re.compile(
+    r"^(.*=.*?\(\d{1,3}[a-z]?\))\s+((?:where|in which|with|here)\b.*)$"
+)
+_NUMBER_TOKEN = re.compile(r"^[(\[]?[-−+]?\d[\d.,:/×%−-]*[)\]]?$")
 # 출판사 전용 글꼴(예: RSC의 AdvOT 계열)에서 잘못 추출되는 글자. 시험한 PDF에서 확인한 것만 넣는다.
 # 깨짐 흔적이 있는 문서에서는 진짜 ¼도 "="로 바뀌는 한계가 있다.
 _LIGATURE_REPAIR = {"": "fi", "": "fl", "": "ft"}
@@ -377,8 +386,21 @@ def _paragraphs(lines: list[tuple[int, str]]) -> list[tuple[str, int, int]]:
     """
     out: list[tuple[str, int, int]] = []
     cur, start, end = "", -1, -1
+    expanded: list[tuple[int, str]] = []
     for j, raw in lines:
+        if m := _EQUATION_THEN_TEXT.match(raw.strip()):
+            expanded += [(j, m.group(1)), (j, m.group(2))]
+        else:
+            expanded.append((j, raw))
+    for j, raw in expanded:
         line = raw.strip()
+        if _is_equation_line(line):
+            # 수식 줄은 혼자 한 구간이 된다
+            if cur:
+                out.append((cur, start, end))
+            out.append((line, j, j))
+            cur = ""
+            continue
         if not line:
             if cur:
                 out.append((cur, start, end))
@@ -405,13 +427,81 @@ def _add_paragraphs(
 ) -> None:
     for para, start, end in _paragraphs(lines):
         k = kind
-        if kind == SegmentKind.BODY and (m := _CAPTION.match(para)):
-            k = SegmentKind.TABLE if m.group(1) == "Table" else SegmentKind.CAPTION
+        if kind == SegmentKind.BODY:
+            if m := _CAPTION.match(para):
+                is_table = m.group(1).upper() == "TABLE"
+                k = SegmentKind.TABLE if is_table else SegmentKind.CAPTION
+            elif start == end and _is_equation_line(para):
+                k = SegmentKind.FORMULA
+            elif _is_figure_text(para):
+                k = SegmentKind.FIGURE_TEXT
         doc.segments.append(
             Segment(
                 k, para, len(doc.segments), page=page, loc=f"p{page}:L{start}-{end}"
             )
         )
+
+
+# 수식 안에 나올 수 있는 소문자 함수 이름
+_MATH_WORDS = frozenset(
+    {
+        "exp",
+        "sin",
+        "cos",
+        "tan",
+        "log",
+        "ln",
+        "max",
+        "min",
+        "lim",
+        "sinh",
+        "cosh",
+        "tanh",
+    }
+)
+
+
+def _is_equation_line(line: str) -> bool:
+    """번호 붙은 수식 줄인지 보수적으로 판정한다.
+
+    등호가 있고 "(번호)"로 끝나며, 소문자가 든 4글자 이상 낱말(수학 함수 이름 제외)이 하나도 없어야 한다.
+    "FWHM" 같은 대문자 약어는 낱말로 세지 않는다.
+    "Substituting k = 0.12 s−1 into eqn (2)"처럼 낱말이 있는 줄은 본문으로 둔다.
+    판단이 애매하면 본문에 남긴다(본문을 잃는 것보다 수식이 섞이는 편이 덜 해롭다).
+    """
+    if not _EQUATION.search(line):
+        return False
+    return not any(
+        len(w) >= 4 and not w.isupper() and w.lower() not in _MATH_WORDS
+        for w in words(line)
+    )
+
+
+def _is_figure_text(para: str) -> bool:
+    """그림 안 글자로 보이는 문단: 6토큰 이상, 문장 부호로 끝나지 않고, 숫자 토큰이 30% 이상이며 영어 기능어가 거의 없다."""
+    toks = para.split()
+    # 문장 부호로 끝나는 짧은 자료 줄("IR (KBr): 1720, 1650 cm−1.")은 본문으로 둔다
+    if len(toks) < 6 or re.search(r"[.;]$", para):
+        return False
+    numeric = sum(bool(_NUMBER_TOKEN.match(t)) for t in toks) / len(toks)
+    # "(a)" 같은 그림 패널 표시는 관사 a로 세지 않는다
+    alpha = words(re.sub(r"\([a-z]\)", " ", para))
+    stop = sum(w.lower() in _STOPWORDS for w in alpha) / max(len(alpha), 1)
+    return numeric >= 0.3 and stop < 0.1
+
+
+def broken_glyph_count(text: str) -> int:
+    """글자로 바뀌지 않은 문자 수: 사용자 정의 영역, 미지정 문자, 대체 문자(�), □(U+25A1), 제어 문자(탭·줄바꿈·쪽 넘김 제외)."""
+    n = 0
+    for ch in text:
+        cat = unicodedata.category(ch)
+        if (
+            cat in ("Co", "Cn", "Cs")
+            or ch in "\ufffd\u25a1"
+            or (cat == "Cc" and ch not in "\n\r\t\f")
+        ):
+            n += 1
+    return n
 
 
 def source_text(doc: Document, seg: Segment) -> str | None:
@@ -457,6 +547,11 @@ def load_pdf(path: Path, engine: str = "pypdf") -> Document:
         page_lines.append(lines)
     if repaired:
         doc.issues.append(f"글꼴 깨짐 문자 {repaired}곳을 알려진 규칙으로 복구함")
+    broken = sum(broken_glyph_count("\n".join(ls)) for ls in page_lines if ls)
+    if broken:
+        doc.issues.append(
+            f"글자로 바뀌지 않은 문자 {broken}개(수식·기호 글꼴일 가능성)"
+        )
     if numbered:
         doc.issues.append(f"줄 번호를 {numbered}쪽에서 지움")
 
@@ -558,5 +653,47 @@ def summarize(doc: Document) -> dict:
         "segments": dict(sorted(kinds.items())),
         "body_words": len(words(doc.text())),
         "formula_placeholders": doc.text().count(FORMULA_PLACEHOLDER),
+        "issues": doc.issues,
+    }
+
+
+def inspect(doc: Document) -> dict:
+    """추출 품질 점검용 집계. 원문 없이 숫자만 낸다(비공개 원고 확인용)."""
+    body = [s.text for s in doc.segments if s.kind == SegmentKind.BODY]
+    lengths = sorted(len(words(t)) for t in body)
+    bins = {"<10": 0, "10-29": 0, "30-79": 0, "80-199": 0, "200+": 0}
+    for n in lengths:
+        key = (
+            "<10"
+            if n < 10
+            else "10-29"
+            if n < 30
+            else "30-79"
+            if n < 80
+            else "80-199"
+            if n < 200
+            else "200+"
+        )
+        bins[key] += 1
+    pages_with_body = {s.page for s in doc.segments if s.kind == SegmentKind.BODY}
+    return {
+        "status": doc.status.value,
+        "segments": dict(sorted(Counter(s.kind.value for s in doc.segments).items())),
+        "body_paragraph_words": bins,
+        "body_paragraph_words_median": lengths[len(lengths) // 2] if lengths else 0,
+        "body_not_ending_with_punctuation": sum(
+            not re.search(r"[.?!:;)\]\"']$", t) for t in body
+        ),
+        "body_starting_lowercase": sum(t[:1].islower() for t in body),
+        "body_starting_with_digit": sum(t[:1].isdigit() for t in body),
+        "body_mostly_numbers": sum(
+            sum(bool(_NUMBER_TOKEN.match(x)) for x in t.split())
+            >= 0.2 * max(len(t.split()), 1)
+            for t in body
+        ),
+        "broken_glyphs_in_body": sum(broken_glyph_count(t) for t in body),
+        "pages_without_body": sorted(
+            i for i in range(1, (doc.pages_total or 0) + 1) if i not in pages_with_body
+        ),
         "issues": doc.issues,
     }

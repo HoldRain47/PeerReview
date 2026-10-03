@@ -6,6 +6,8 @@ from peerreview import ingest, main
 from peerreview.ingest import (
     FORMULA_PLACEHOLDER,
     SegmentKind,
+    _is_equation_line,
+    _is_figure_text,
     _paragraphs,
     _repair_glyphs,
     _running_lines,
@@ -293,3 +295,65 @@ def test_cli_refuses_to_overwrite_input(tmp_path):
     p.write_text(JATS, encoding="utf-8")
     assert main(["ingest", str(p), "--out", str(p)]) == 2
     assert p.read_text(encoding="utf-8") == JATS
+
+
+def test_figure_text_equations_and_broken_glyphs(tmp_path, monkeypatch):
+    box = chr(0xF061)  # 수식 글꼴에서 글자로 바뀌지 않은 문자
+    page = "\n".join(
+        [f"Line {k}: {FILLER.strip()}" for k in range(25)]
+        + [
+            "",
+            "2.6 2.8 3.0 3.2 3.4 2.3298 2.3320 Photon Energy (eV) (a) E0= 2.32 eV",
+            "",
+            f"FWHM (T) = G0 + {box}T + b (7) where G0 represents the broadening at 0 K.",
+            "TABLE 2. Fitted parameters of the model",
+            "",
+            "Results agree with the model in the whole range of temperature.",
+        ]
+    )
+    _fake_pages(monkeypatch, [page])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    doc = load(p)
+    kinds = {s.text[:12]: s.kind for s in doc.segments}
+    assert kinds["2.6 2.8 3.0 "] == SegmentKind.FIGURE_TEXT
+    assert kinds["FWHM (T) = G"] == SegmentKind.FORMULA
+    assert kinds["where G0 rep"] == SegmentKind.BODY  # 수식 뒤 설명은 본문으로 남긴다
+    assert kinds["TABLE 2. Fit"] == SegmentKind.TABLE  # 대문자 표 제목
+    assert any("글자로 바뀌지 않은 문자 1개" in i for i in doc.issues)
+
+
+def test_body_lines_with_equals_or_numbers_stay_body():
+    # 검증에서 지적된 회귀 사례: 등호·식 번호·숫자가 있어도 문장이면 본문이다
+    lines = [
+        "The rate constant was then obtained from the fitted slope of the line.",
+        "Substituting k = 0.12 s\u22121 into eqn (2)",
+        "gives the half-life, consistent with values (Tg = 105 \u00b0C, Tm = 230 \u00b0C) reported earlier (12)",
+        "for similar polymers.",
+    ]
+    paras = _paragraphs(list(enumerate(lines)))
+    assert len(paras) == 2 and paras[1][0].startswith("Substituting")
+    assert not any(_is_equation_line(x) for x in lines)
+    assert _is_equation_line("FWHM (T) = G0 + aT + b exp(c/kT) (7)")
+    assert not _is_figure_text("IR (KBr): 1720, 1650, 1600 cm\u22121.")
+    assert not _is_figure_text(
+        "The yields were 85, 90 and 92% at 300, 350 and 400 K, respectively."
+    )
+    assert _is_figure_text("2.6 2.8 3.0 3.2 3.4 Photon Energy (eV) (a) E0= 2.32 eV")
+
+
+def test_inspect_reports_numbers_only(tmp_path, capsys):
+    p = tmp_path / "paper.xml"
+    p.write_text(JATS, encoding="utf-8")
+    assert main(["inspect", str(p)]) == 0
+    printed = capsys.readouterr().out
+    data = json.loads(printed)
+    assert data["status"] == "completed"
+    assert set(data["body_paragraph_words"]) == {
+        "<10",
+        "10-29",
+        "30-79",
+        "80-199",
+        "200+",
+    }
+    assert "membrane" not in printed.lower()

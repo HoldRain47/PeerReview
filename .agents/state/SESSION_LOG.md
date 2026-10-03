@@ -31,6 +31,11 @@
 - 결과: Crossref에 5건 요청이 이메일과 함께 전송됐다. 이후 조회에서는 뺐다.
 - 재발 방지: 지침만. 외부 API에 사용자 식별 정보(이메일 등)를 넣을 때는 먼저 묻는다.
 
+### E003 비공개 원고 일부가 화면 캡처로 대화에 전송됨 (T002.2)
+- 원인: 추출 결과 확인을 요청하면서 원문 없이 확인할 도구가 없었고, "직접 확인"의 방법도 구체적으로 안내하지 않았다.
+- 결과: 사용자가 원문이 든 구간 파일의 화면 캡처를 보내 원고 일부가 모델 제공자 서버로 전송됐다. 에이전트는 내용을 인용하거나 기록하지 않았다.
+- 재발 방지: 원문 없이 품질 지표만 내는 `peerreview inspect` 추가, docs/입력처리비교.md 7절에 "캡처·복사 금지"를 명시. 검사로는 막을 수 없다(사용자 행동).
+
 ## 2026-10-03 T000 프로젝트 세팅
 - 결과: HarnessKit v26092612 전체 수준(Claude Code·Codex) 설치, git init, uv 패키지 골격과 판정 어휘(model.py) 작성, 제공 자료를 docs/source/로 이동.
 - 증거: `uv run pytest -q` 3 passed, `uv run ruff check .` 통과, verify.py 불일치 없음, stop-check.sh 종료 코드 0.
@@ -60,3 +65,8 @@
 - 결과: src/peerreview/ingest.py(XML·PDF 입력, 구간 종류, 처리 상태, 원문 위치 대응), CLI `peerreview ingest`(원문 없는 요약만 출력), 비교 스크립트와 docs/입력처리비교.md. pypdf 채택.
 - 증거: 공개 5편 XML 대비 pypdf recall 0.850~0.995, 위치 대응 전 구간 성공, `uv run pytest -q` 19 passed, ruff 통과, verifier 지적 9건 반영.
 - 남은 것: 비공개 원고 사용자 실행(요약과 확인 1~4), MDPI 뒷부분 절 제거, Windows 10 실기 확인.
+
+## 2026-10-04 T002.2 비공개 원고 1차 결과 반영 [review]
+- 결과: 그림 안 글자(figure_text), 번호 붙은 수식 줄 분리, 깨진 글자 경고, 대문자 표 제목, 원문 없는 점검 명령 inspect 추가.
+- 증거: `uv run pytest -q` 22 passed, ruff 통과, 공개 5편 recall 변화 없음(0.850~0.995). verifier 회귀 지적 3건 반영. 오류 E003.
+- 남은 것: 비공개 원고 2차 실행 결과(숫자만), Windows 10 실기 확인, MDPI 뒷부분 절 제거.
