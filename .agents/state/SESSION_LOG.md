@@ -75,3 +75,8 @@
 - 결과: 절 제목(heading), 앞부분(front_matter), 뒷부분(back_matter: 감사의 글·저자 기여·기호표 등) 분리, inspect에 수식 진단 지표 추가. XML 정답에도 같은 뒷부분 분류 적용.
 - 증거: `uv run pytest -q` 26 passed, ruff 통과, 공개 5편 recall 0.848~0.993 유지, MDPI precision 0.545~0.713로 상승. verifier 지적 3건(본문 손실) 반영.
 - 남은 것: 비공개 원고 3차 실행(숫자만), 점검 1.
+
+## 2026-10-04 T002.2 입력 처리 시범 [done]
+- 결과: pypdf 기반 입력 처리 완료. 비공개 원고 3차 inspect에서 제목 10·앞부분 10·뒷부분 2 분리, 숫자로 시작하는 본문 22→12, 문서 단위 판정 가능 품질로 판단.
+- 증거: docs/입력처리비교.md 7절(숫자만), pytest 26 passed, CI windows-latest 통과.
+- 남은 것: 점검 1 판단, Windows 10 실기 확인, 본문 안 깨진 글자 18개(번호 없는 수식 조각)는 한계로 기록.
