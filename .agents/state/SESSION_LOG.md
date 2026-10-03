@@ -90,3 +90,8 @@
 - 결과: Europe PMC에서 후보 3,877편, 층화 표본 300편 XML과 data/manifest.jsonl. manifest.py(목록·검사·배분), check-manifest 명령, 수집 스크립트.
 - 증거: check-manifest 오류 0, 300편 입력 처리 completed, `uv run pytest -q` 62 passed. 수집 스크립트 페이지 끝 결함, 공지 섞임, 영어 판별 기준(0.15→0.04 + 다른 언어 기능어 검사)을 고침.
 - 남은 것: T002.5 변형본 생성(모델·비용 결정 필요). 규모 확정은 점검 2.
+
+## 2026-10-04 T002.5 변형본 시범 생성 [review]
+- 결과: 씨앗 5편 × 행위 5개 = 변형본 25개(Claude Sonnet 하위 에이전트 12, OpenAI chat-latest 13). 의도와 다른 라벨 0건.
+- 증거: OpenAI 비용 0.2888달러(상한 3달러), check-manifest 325건·check-labels 30건 오류 0, `uv run pytest -q` 69 passed. 하위 에이전트 보고의 "번역 4건"은 오류(실제 3건)로 파일 대조로 확인.
+- 남은 것: 사용자 5건 확인, 점검 2.
