@@ -15,7 +15,7 @@
       "asked_at": "2026-10-03",
       "t001_scope": {
         "language": "영어 원고",
-        "field": "공학·컴퓨터과학",
+        "field": "Chemical Engineering (2026-10-03 사용자 정정)",
         "target_acts": "본문 생성+재작성(혼합·AI 초안 사람 수정 포함)",
         "doc_unit": "논문 전체(문단·문장 표시는 근거 위치 안내)",
         "result_states": "model.py 증거 수준 5·처리 상태 5 유지, search_ideation 추가",
@@ -34,7 +34,7 @@
       "교정·번역·재작성 경계 사례와 반례가 라벨 지침에 있다",
       "수용 기준(허용 오탐·재현율·유보율·처리량)의 결정 책임자와 시점이 적혀 있다"
     ],
-    "next_action": "사용자가 docs/목표정의서-v26100301.md와 docs/라벨지침-v26100301.md를 검토한다. 승인되면 T001 done, T002 착수",
+    "next_action": "사용자가 tasks/plan.md의 결정 Q1~Q3·Q5에 답한다. 답을 받으면 T002.1 자료 출처 조사부터 시작",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -58,15 +58,86 @@
       "done_when": [
         "8절 첫 단계 산출물 작성"
       ],
-      "evidence": "목표정의서·라벨지침 v26100301 작성(경계 사례 L01~L18). 라벨 일치도 시험 미실행. pytest 4 passed, ruff 통과",
+      "evidence": "목표정의서·라벨지침 v26100302 작성(경계 사례 L01~L18). 라벨 일치도 시험 미실행. pytest 4 passed, ruff 통과. 분야 정정(Chemical Engineering)",
       "commits": []
     },
     {
-      "id": "T002",
-      "title": "평가 자료 설계와 입력 처리(추출·원문 위치 보존)",
+      "id": "T002.1",
+      "title": "자료 출처와 이용 조건 조사",
       "status": "todo",
       "done_when": [
-        "8절 두 번째 단계 산출물"
+        "출처별 이용 조건·형식·2022년 이전 규모가 docs/자료출처조사.md에 있다"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.2",
+      "title": "입력 처리 시범(대표 논문 5편, 라이브러리 2개 비교)",
+      "status": "todo",
+      "done_when": [
+        "비교표와 채택 근거가 docs/입력처리비교.md에 있다",
+        "위치 대응·처리 상태 시험 통과"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.3",
+      "title": "라벨 기록 형식과 검사",
+      "status": "todo",
+      "done_when": [
+        "L01~L18 사례 시험이 지침 표와 같은 결과"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.4",
+      "title": "사람 작성(D) 집단 수집과 자료 목록",
+      "status": "todo",
+      "done_when": [
+        "목록 해시 검사 통과"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.5",
+      "title": "변형본 생성 프로토콜과 시범 생성",
+      "status": "todo",
+      "done_when": [
+        "행위별 시범 묶음 5개, 재분류가 의도와 일치"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.6",
+      "title": "본 수집과 묶음 단위 분리",
+      "status": "todo",
+      "done_when": [
+        "묶음 겹침 시험 통과, 시험 묶음 해시 기록"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.7",
+      "title": "추출 품질 기록",
+      "status": "todo",
+      "done_when": [
+        "처리 상태 집계와 20편 사람 확인 기록"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.8",
+      "title": "라벨 일관성 확인",
+      "status": "todo",
+      "done_when": [
+        "표본 30건 이중 라벨과 불일치 처리 기록"
       ],
       "evidence": "",
       "commits": []
@@ -87,5 +158,5 @@
     "unit": "",
     "note": ""
   },
-  "updated_at": "2026-10-03T22:00:00+09:00"
+  "updated_at": "2026-10-03T23:00:00+09:00"
 }

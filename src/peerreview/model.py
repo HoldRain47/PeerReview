@@ -21,7 +21,7 @@ class InvolvementAct(StrEnum):
     UNKNOWN = "unknown"  # 미상
 
 
-# 1차 목표 행위 (목표 정의서 v26100301). 혼합 작성과 AI 초안의 사람 수정도
+# 1차 목표 행위 (목표 정의서 v26100302). 혼합 작성과 AI 초안의 사람 수정도
 # 생성이 포함되므로 목표 행위가 있는 것으로 보되, 결과는 행위별로 나눠 보고한다.
 TARGET_ACTS = frozenset(
     {
