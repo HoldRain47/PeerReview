@@ -85,3 +85,8 @@
 - 결과: 점검 1 진행 결정(Windows 10 실기 확인은 뒤로). labels.py와 check-labels 명령 작성. 해석 결정: acts에 unknown이 섞이면 근거 A여도 아니오로 확정하지 않음.
 - 증거: `uv run pytest -q` 52 passed(L01~L18 지침 표와 일치), ruff 통과, verifier 지적 반영.
 - 남은 것: 다음 라벨 지침 개정 때 "초안" 표기와 unknown 해석을 지침 본문에 반영. T002.4 범위 결정.
+
+## 2026-10-04 T002.4 사람 작성(D) 집단 수집과 자료 목록 [done]
+- 결과: Europe PMC에서 후보 3,877편, 층화 표본 300편 XML과 data/manifest.jsonl. manifest.py(목록·검사·배분), check-manifest 명령, 수집 스크립트.
+- 증거: check-manifest 오류 0, 300편 입력 처리 completed, `uv run pytest -q` 62 passed. 수집 스크립트 페이지 끝 결함, 공지 섞임, 영어 판별 기준(0.15→0.04 + 다른 언어 기능어 검사)을 고침.
+- 남은 것: T002.5 변형본 생성(모델·비용 결정 필요). 규모 확정은 점검 2.

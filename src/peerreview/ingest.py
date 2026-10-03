@@ -27,7 +27,20 @@ from peerreview.model import ProcessingStatus
 # 분량 부족 기준(본문 단어 수). 임시값이며 T003에서 길이별 결과를 보고 정한다(목표 정의서 6절).
 MIN_BODY_WORDS = 300
 # 영어 판별 임시값: 본문 낱말 중 흔한 영어 기능어 비율의 하한, 라틴 문자가 아닌 낱말 비율의 상한.
-MIN_ENGLISH_STOPWORD_RATIO = 0.15
+# 2026-10-04 보정(두 차례): 처음 값 0.15는 화합물 이름이 많은 영어 논문을 걸렀다. 공개 영어 논문 667편의
+# 최솟값이 0.073이라, 다른 언어는 아래 "다른 언어 기능어" 검사로 거르고 이 값은 글자가 거의 없는
+# 문서를 막는 안전장치로 0.04에 둔다. 독일어·스페인어 예문 0.000, 프랑스어 예문 0.069.
+MIN_ENGLISH_STOPWORD_RATIO = 0.04
+# 다른 언어에만 쓰이는 기능어 비율의 상한. 영어 667편 최대 0.025, 이탈리아어 예문 0.147,
+# 프랑스어 예문 0.138, 영어 초록 + 이탈리아어 본문 0.115를 보고 0.05로 정했다(2026-10-04).
+MAX_FOREIGN_FUNCTION_RATIO = 0.05
+# 영어 화학 논문에도 나오는 말(La=란타넘, per, de Gennes 같은 이름)은 넣지 않는다.
+_FOREIGN_FUNCTION_WORDS = frozenset(
+    {"der", "die", "und", "nicht", "ist", "mit", "von", "sich", "das"}
+    | {"les", "des", "une", "est", "sont", "dans", "pour", "avec"}
+    | {"che", "della", "sono", "nella", "degli", "delle", "il", "di"}
+    | {"los", "las", "del", "una", "para", "como", "por", "que", "el"}
+)
 MAX_NON_LATIN_RATIO = 0.3
 FORMULA_PLACEHOLDER = "[FORMULA]"
 
@@ -779,10 +792,16 @@ def assess(doc: Document) -> Document:
         return doc
     non_latin = sum(not t.isascii() for t in tokens) / len(tokens)
     stop_ratio = sum(t.lower() in _STOPWORDS for t in tokens) / len(tokens)
-    if non_latin > MAX_NON_LATIN_RATIO or stop_ratio < MIN_ENGLISH_STOPWORD_RATIO:
+    foreign = sum(t.lower() in _FOREIGN_FUNCTION_WORDS for t in tokens) / len(tokens)
+    if (
+        non_latin > MAX_NON_LATIN_RATIO
+        or stop_ratio < MIN_ENGLISH_STOPWORD_RATIO
+        or foreign > MAX_FOREIGN_FUNCTION_RATIO
+    ):
         doc.status = ProcessingStatus.OUT_OF_SCOPE
         doc.issues.append(
-            f"영어 본문으로 보기 어려움(기능어 비율 {stop_ratio:.2f}, 비라틴 낱말 비율 {non_latin:.2f})"
+            f"영어 본문으로 보기 어려움(영어 기능어 {stop_ratio:.2f}, 다른 언어 기능어 {foreign:.2f},"
+            f" 비라틴 낱말 {non_latin:.2f})"
         )
     elif len(words(body)) < MIN_BODY_WORDS:
         doc.status = ProcessingStatus.TOO_SHORT

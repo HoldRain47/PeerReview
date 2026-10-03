@@ -458,3 +458,23 @@ def test_body_sentences_are_not_markers(tmp_path, monkeypatch):
         for s in doc.segments
     )
     assert not doc.text(SegmentKind.BACK_MATTER)
+
+
+def test_other_latin_languages_out_of_scope(tmp_path):
+    fr = "La membrane a été testée dans le réacteur et le flux d'eau a été mesuré à chaque étape. "
+    p = tmp_path / "fr.xml"
+    p.write_text(JATS.replace(FILLER * 30, fr * 60), encoding="utf-8")
+    assert load(p).status == ProcessingStatus.OUT_OF_SCOPE
+
+
+def test_low_accent_language_and_mixed_document_out_of_scope(tmp_path):
+    it = (
+        "La membrana è stata provata nel reattore e il flusso di acqua è stato misurato in ogni passo. "
+        "I risultati mostrano che la selettività aumenta con la temperatura e con il tempo di contatto. "
+    )
+    en = "The membrane was tested in the reactor and the water flux was measured at each step. "
+    de = "Die Membran wurde im Reaktor getestet und der Fluss des Wassers wurde gemessen. "
+    for name, body in (("it", it * 40), ("de", de * 60), ("mixed", en * 30 + it * 50)):
+        p = tmp_path / f"{name}.xml"
+        p.write_text(JATS.replace(FILLER * 30, body), encoding="utf-8")
+        assert load(p).status == ProcessingStatus.OUT_OF_SCOPE, name

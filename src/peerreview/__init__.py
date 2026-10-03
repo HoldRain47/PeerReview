@@ -27,11 +27,37 @@ def main(argv: list[str] | None = None) -> int:
         "check-labels", help="라벨 파일(JSON Lines)의 형식과 판정 규칙을 검사한다"
     )
     p_lab.add_argument("file", type=Path)
+    p_man = sub.add_parser(
+        "check-manifest", help="자료 목록의 파일·해시·이용 조건·연도를 검사한다"
+    )
+    p_man.add_argument("file", type=Path)
+    p_man.add_argument(
+        "--root", type=Path, default=Path("."), help="목록의 path가 기준으로 삼는 폴더"
+    )
     args = parser.parse_args(argv)
 
     # Windows 콘솔 인코딩에서 출력할 수 없는 글자가 있어도 멈추지 않게 한다.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="backslashreplace")
+
+    if args.command == "check-manifest":
+        from collections import Counter
+
+        from peerreview.manifest import check_manifest, load_manifest
+
+        entries, errors = load_manifest(args.file)
+        errors += check_manifest(entries, args.root)
+        for e in errors:
+            print(e)
+        summary = {
+            "entries": len(entries),
+            "errors": len(errors),
+            "journals": Counter(e.journal for e in entries),
+            "years": dict(sorted(Counter(e.pub_year for e in entries).items())),
+            "subfields": Counter(s for e in entries for s in e.subfields),
+        }
+        print(json.dumps(summary, ensure_ascii=False))
+        return 1 if errors else 0
 
     if args.command == "check-labels":
         from collections import Counter
