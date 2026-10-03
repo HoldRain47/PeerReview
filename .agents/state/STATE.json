@@ -29,6 +29,19 @@
         "recent_human": "작성 기록 없음. 비공개 논문 1편(로컬 전용, 입력 처리 시범·불확실 집단 C)",
         "label_consistency": "사용자 단독, 1~2주 간격 30건 재라벨",
         "decided_at": "2026-10-03"
+      },
+      "runtime": {
+        "os": "Windows 10/11 필수(Mac 선택)",
+        "ui": "GUI 우선, 호환 문제 시 CLI",
+        "install": "Python 설치형(uv)",
+        "windows_test": "사용자가 Windows 10 환경 준비, GitHub Actions windows-latest 보조",
+        "decided_at": "2026-10-03"
+      },
+      "git_remote": {
+        "repo": "GitHub public(예정)",
+        "exclude": "docs/source(제공 자료), data/",
+        "author_email": "그대로",
+        "backup_branch": "backup/pre-public-20261003 (제공 자료 포함, push 금지)"
       }
     }
   },
@@ -39,7 +52,7 @@
     "done_when": [
       "출처별 이용 조건(주소·확인일)·형식·2022년 이전 규모·변형본 생성 허용 여부가 docs/자료출처조사.md에 있다"
     ],
-    "next_action": "T002.1 시작: Chemical Engineering 공개 OA 출처 조사. T001은 사용자 검토 대기(review)",
+    "next_action": "사용자 gh auth login 후 public 저장소 생성·main push, Windows CI 추가. 이어서 T002.1",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -163,5 +176,5 @@
     "unit": "",
     "note": ""
   },
-  "updated_at": "2026-10-03T21:37:43+09:00"
+  "updated_at": "2026-10-03T21:54:17+09:00"
 }
