@@ -42,7 +42,10 @@
       "Edit(./data/private/**)",
       "Edit(./data/private)",
       "Write(./data/private/**)",
-      "Write(./data/private)"
+      "Write(./data/private)",
+      "Read(./.env)",
+      "Edit(./.env)",
+      "Write(./.env)"
     ]
   }
 }

@@ -12,3 +12,6 @@ data/*
 
 # 제공 자료는 공개 저장소에 올리지 않는다 (2026-10-03 사용자 결정). 로컬에만 둔다.
 docs/source/
+
+# API 키 파일. 커밋하지 않고 에이전트도 읽지 않는다(.claude/settings.json deny)
+.env

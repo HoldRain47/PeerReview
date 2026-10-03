@@ -133,7 +133,7 @@
     ".claude/settings.json": {
       "source": "project/.claude/settings.json",
       "version": "v26092612",
-      "sha256": "76fa69f70e9f9bea8e540b4d6db6a75dc62fee5e204a82bacc04139bd644d56d"
+      "sha256": "51fa02a0a960cd29ef1bbbbcb1c104be849ec775021dc1661a71e11cbe5ed892"
     },
     ".claude/skills/harness-start/SKILL.md": {
       "source": "skills/harness-start/SKILL.md",
@@ -322,5 +322,5 @@
     "codex"
   ],
   "kit_home_hint": "~/.agents/harness-kit",
-  "relocked_at": "2026-10-03 22:13 KST"
+  "relocked_at": "2026-10-04 02:27 KST"
 }
