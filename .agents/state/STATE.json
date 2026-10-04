@@ -70,14 +70,14 @@
     }
   },
   "current": {
-    "task_id": "T002.5",
-    "title": "변형본 생성 프로토콜과 시범 생성",
-    "status": "review",
+    "task_id": "점검2",
+    "title": "점검 2: 본 수집 규모 확정",
+    "status": "todo",
     "done_when": [
       "행위별 시범 묶음 5개, 재분류가 의도와 일치",
       "생성 기록(모델·버전·입력문·시점·원출력)으로 변형본을 다시 대조할 수 있다"
     ],
-    "next_action": "사용자가 review.md 5건의 라벨 맞음/아님을 알려 준다. 그 뒤 점검 2(본 수집 규모 확정)",
+    "next_action": "사용자 답: 한국인 저자의 한국어 작성 + 전문기관 번역 경로를 계획에 반영할지. 그 뒤 점검 2(규모·비용)",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -148,11 +148,31 @@
     {
       "id": "T002.5",
       "title": "변형본 생성 프로토콜과 시범 생성",
-      "status": "review",
+      "status": "done",
       "done_when": [
         "행위별 시범 묶음 5개, 재분류가 의도와 일치"
       ],
-      "evidence": "변형본 25개(Claude 12, OpenAI chat-latest 13, 비용 0.2888달러), 라벨 변경 0, check-manifest 325·check-labels 30 오류 0. 사용자 5건 확인 대기(data/public/variants/review.md)",
+      "evidence": "변형본 25개(Claude 12, OpenAI chat-latest 13, 비용 0.2888달러), 라벨 변경 0, check-manifest 325·check-labels 30 오류 0. 사용자 5건 확인 대기(data/public/variants/review.md). 사용자: 교정·재작성은 사람이 구별 불가 수준 → 에이전트가 5절 기준 점검, 10건 모두 라벨 맞음",
+      "commits": []
+    },
+    {
+      "id": "T002.2b",
+      "title": "입력 처리에서 첨자 형식 흔적 보존",
+      "status": "todo",
+      "done_when": [
+        "inspect에 형식 흔적 개수가 나오고, CO₂ 문단이 흔적 1개로 기록된다"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T002.5b",
+      "title": "화학식을 직접 쓰게 하는 변형본",
+      "status": "todo",
+      "done_when": [
+        "모델별 첨자 표기 방식 집계가 있다"
+      ],
+      "evidence": "",
       "commits": []
     },
     {
@@ -190,7 +210,8 @@
       "title": "기존 목록·정규식 기준선 성능 측정",
       "status": "todo",
       "done_when": [
-        "8절 세 번째 단계 산출물"
+        "8절 세 번째 단계 산출물",
+        "형식 흔적 신호의 정상 논문 오탐 측정"
       ],
       "evidence": "",
       "commits": []
