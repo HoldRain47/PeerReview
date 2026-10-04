@@ -91,6 +91,9 @@ class Segment:
     section: str = ""  # 소속 절 제목(XML) 또는 빈 값
     page: int | None = None  # 1부터. XML이면 None
     loc: str = ""  # 원문 위치(모듈 설명 참고)
+    traces: dict[str, int] = field(
+        default_factory=dict
+    )  # 정규화 전 첨자 형식 흔적 개수
 
 
 @dataclass
@@ -106,6 +109,8 @@ class Document:
     issues: list[str] = field(default_factory=list)
     # PDF 추출기가 낸 정규화 전 쪽별 줄. 위치 대응용이며 요약·저장에 넣지 않는다.
     raw_lines: list[list[str] | None] = field(default_factory=list, repr=False)
+    # 형식 흔적을 이미 센 (쪽, 줄). 한 줄이 두 구간으로 나뉘어도 한 번만 센다
+    _traced_lines: set[tuple[int, int]] = field(default_factory=set, repr=False)
 
     def text(self, kind: SegmentKind = SegmentKind.BODY) -> str:
         return "\n\n".join(s.text for s in self.segments if s.kind == kind)
@@ -117,6 +122,32 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+# 첨자 형식 흔적 (사용자 제안 2026-10-04, docs/변형본생성규칙.md 8절).
+# 논문은 첨자를 글꼴 서식으로 쓰지만, AI 채팅 도구는 유니코드 첨자 문자나 LaTeX·마크다운 표기로 내놓는다.
+# 사람도 기호 넣기로 유니코드 첨자를 쓰므로 관찰일 뿐 판정 근거가 아니다(목표 정의서 5절 style_signal).
+TRACE_PATTERNS = {
+    "unicode_subsup": re.compile("[\u2070-\u209f\u00b2\u00b3\u00b9]"),
+    "latex": re.compile(
+        r"\$[^$\n]{0,60}?[_^][^$\n]{0,60}?\$|\\[(\[]|[_^]\{[^}\n]{1,20}\}"
+        r"|\\(?:mathrm|text|frac|cdot|times)\b"
+    ),
+    "markup": re.compile(r"</?su[bp]>|~\d{1,3}~|\^\d{1,3}\^"),
+}
+
+
+def format_traces(text: str) -> dict[str, int]:
+    """정규화 전 글자에서 첨자 형식 흔적을 종류별로 센다. 없는 종류는 빼고 돌려준다."""
+    counts = {name: len(p.findall(text)) for name, p in TRACE_PATTERNS.items()}
+    return {k: v for k, v in counts.items() if v}
+
+
+def _sum_traces(segments: list[Segment]) -> dict[str, int]:
+    total: Counter[str] = Counter()
+    for seg in segments:
+        total.update(seg.traces)
+    return dict(sorted(total.items()))
 
 
 def words(text: str) -> list[str]:
@@ -190,7 +221,14 @@ def load_jats(path: Path) -> Document:
     def add(kind: SegmentKind, text: str, section: str, loc: str) -> None:
         if text:
             doc.segments.append(
-                Segment(kind, text, len(doc.segments), section, loc=loc)
+                Segment(
+                    kind,
+                    text,
+                    len(doc.segments),
+                    section,
+                    loc=loc,
+                    traces=format_traces(text),
+                )
             )
 
     def add_inner(el: ET.Element, loc: str, section: str) -> None:
@@ -499,9 +537,22 @@ def _add_paragraphs(
                 k = SegmentKind.HEADING
             elif _is_figure_text(para):
                 k = SegmentKind.FIGURE_TEXT
+        raw = doc.raw_lines[page - 1] if 0 < page <= len(doc.raw_lines) else None
+        fresh = [j for j in range(start, end + 1) if (page, j) not in doc._traced_lines]
+        doc._traced_lines.update((page, j) for j in fresh)
+        traces = (
+            format_traces("\n".join(raw[j] for j in fresh if j < len(raw)))
+            if raw
+            else {}
+        )
         doc.segments.append(
             Segment(
-                k, para, len(doc.segments), page=page, loc=f"p{page}:L{start}-{end}"
+                k,
+                para,
+                len(doc.segments),
+                page=page,
+                loc=f"p{page}:L{start}-{end}",
+                traces=traces,
             )
         )
 
@@ -837,6 +888,10 @@ def summarize(doc: Document) -> dict:
         "segments": dict(sorted(kinds.items())),
         "body_words": len(words(doc.text())),
         "formula_placeholders": doc.text().count(FORMULA_PLACEHOLDER),
+        "format_traces": _sum_traces(doc.segments),
+        "format_traces_body": _sum_traces(
+            [s for s in doc.segments if s.kind == SegmentKind.BODY]
+        ),
         "issues": doc.issues,
     }
 
@@ -885,6 +940,12 @@ def inspect(doc: Document) -> dict:
         # 그 문단에서 수식으로 떼어 내지 못한 이유: 소문자 4글자 이상 낱말이 함께 있음
         "body_equation_like_with_words": sum(
             bool(eq.search(t)) and not _is_equation_line(t) for t in body
+        ),
+        "format_traces_body": _sum_traces(
+            [s for s in doc.segments if s.kind == SegmentKind.BODY]
+        ),
+        "body_paragraphs_with_traces": sum(
+            bool(s.traces) for s in doc.segments if s.kind == SegmentKind.BODY
         ),
         "pages_without_body": sorted(
             i for i in range(1, (doc.pages_total or 0) + 1) if i not in pages_with_body

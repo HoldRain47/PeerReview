@@ -478,3 +478,46 @@ def test_low_accent_language_and_mixed_document_out_of_scope(tmp_path):
         p = tmp_path / f"{name}.xml"
         p.write_text(JATS.replace(FILLER * 30, body), encoding="utf-8")
         assert load(p).status == ProcessingStatus.OUT_OF_SCOPE, name
+
+
+def test_format_traces_patterns():
+    from peerreview.ingest import format_traces
+
+    assert format_traces("CO₂ uptake of 3 mmol g⁻¹ at 25 °C") == {"unicode_subsup": 3}
+    assert format_traces("The flux of $CO_2$ and H_{2}O with \\mathrm{K}") == {
+        "latex": 3
+    }
+    assert format_traces("H<sub>2</sub>O and CO~2~") == {"markup": 3}
+    # 사람이 쓴 평문, 달러 금액, 서식 없는 화학식은 흔적이 아니다
+    assert (
+        format_traces("The plant cost $5 million and emitted CO2 at 2.5 t per day.")
+        == {}
+    )
+
+
+def test_traces_survive_pdf_normalization_and_count_once(tmp_path, monkeypatch):
+    page = "\n".join(
+        [f"Line {k}: {FILLER.strip()}" for k in range(25)]
+        + ["", "The CO₂ capture capacity reached 4.2 mmol g⁻¹ in the test.", ""]
+        + ["FWHM (T) = G0 + aT (7) where the CO₂ term dominates at high T."]
+    )
+    _fake_pages(monkeypatch, [page])
+    p = tmp_path / "x.pdf"
+    p.write_bytes(b"%PDF-1.4")
+    doc = load(p)
+    seg = next(s for s in doc.segments if "capture capacity" in s.text)
+    assert "CO2" in seg.text  # 분석용 글자는 NFKC로 정규화된다
+    assert seg.traces == {
+        "unicode_subsup": 3
+    }  # 흔적은 정규화 전 글자에서 센다(₂, ⁻, ¹)
+    total = summarize(doc)["format_traces"]
+    assert total == {"unicode_subsup": 4}  # 수식·설명으로 나뉜 줄의 ₂는 한 번만 센다
+
+
+def test_jats_traces_and_inspect_counts(tmp_path):
+    xml = JATS.replace("capture.</p>", "capture with CO₂ at 2 bar.</p>")
+    p = tmp_path / "paper.xml"
+    p.write_text(xml, encoding="utf-8")
+    data = inspect(load(p))
+    assert data["format_traces_body"] == {"unicode_subsup": 1}
+    assert data["body_paragraphs_with_traces"] == 1

@@ -91,13 +91,13 @@
     }
   },
   "current": {
-    "task_id": "T002.10",
-    "title": "한영 초록 짝 수집(「화학공학」, 근거 D)",
-    "status": "blocked",
+    "task_id": "T002.5b",
+    "title": "화학식을 직접 쓰게 하는 변형본",
+    "status": "todo",
     "done_when": [
       "docs/번역자료출처조사.md에 출처별 이용 조건·규모·형식·짝 여부·외부 전송 가능 여부"
     ],
-    "next_action": "KCI 키 대기 중. 사용자 결정에 따라 T002.2b(첨자 형식 흔적 보존)를 먼저 진행할 수 있다",
+    "next_action": "사용자 승인 시 T002.5b. KCI 키는 10-05 18시 이후",
     "blockers": [
       "KCI 회원가입 작업 기간(2026-10-02 18시~10-05 18시)이라 KCI Open API 키 발급 불가. 10-05 18시 이후 사용자가 open.kci.go.kr \"데이터 신청\"에서 키를 받아 .env의 KCI_API_KEY로 넣는다"
     ]
@@ -178,11 +178,11 @@
     {
       "id": "T002.2b",
       "title": "입력 처리에서 첨자 형식 흔적 보존",
-      "status": "todo",
+      "status": "done",
       "done_when": [
         "inspect에 형식 흔적 개수가 나오고, CO₂ 문단이 흔적 1개로 기록된다"
       ],
-      "evidence": "",
+      "evidence": "format_traces(유니코드·LaTeX·마크업) 구간별 기록, summarize·inspect 집계, pytest 87 passed. 씨앗 300·변형본 25 본문 0건, 출판사 PDF 1편 18건(그래프 범례 m² 유입 = 오탐 경로). PDF 서식 첨자 탐지 가능성 확인",
       "commits": []
     },
     {
