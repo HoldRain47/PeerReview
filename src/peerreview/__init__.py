@@ -62,19 +62,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check-labels":
         from collections import Counter
 
-        from peerreview.labels import derive_target, load_labels
+        from peerreview.labels import derive_stages, load_labels
 
         records, errors = load_labels(args.file)
         for e in errors:
             print(e)
-        counts = Counter(derive_target(r).value for r in records)
+        stages: dict[str, Counter] = {}
+        for r in records:
+            for stage, value in derive_stages(r).items():
+                stages.setdefault(stage.value, Counter())[value.value] += 1
         print(
             json.dumps(
-                {
-                    "records": len(records),
-                    "errors": len(errors),
-                    "target_present": counts,
-                }
+                {"records": len(records), "errors": len(errors), "stages": stages}
             )
         )
         return 1 if errors else 0

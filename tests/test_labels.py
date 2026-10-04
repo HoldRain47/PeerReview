@@ -1,4 +1,4 @@
-"""라벨 기록 시험. 라벨 지침 6절의 사례 L01~L18이 지침 표와 같은 결과를 내는지 본다."""
+"""라벨 기록 시험. 라벨 지침 v26100303 6절의 사례 L01~L24가 지침 표와 같은 결과를 내는지 본다."""
 
 import json
 
@@ -117,7 +117,10 @@ def test_check_labels_cli(tmp_path, capsys):
     save_labels(p, [LabelRecord("d1", "b1", TruthBasis.A, [Act.GENERATION])])
     assert main(["check-labels", str(p)]) == 0
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert out == {"records": 1, "errors": 0, "target_present": {"yes": 1}}
+    assert out["records"] == 1 and out["errors"] == 0
+    assert out["stages"]["body"] == {"yes": 1} and out["stages"]["ai_translation"] == {
+        "no": 1
+    }
     p.write_text(
         '{"doc_id": "x", "bundle_id": "", "truth_basis": "A"}\n', encoding="utf-8"
     )
@@ -137,3 +140,110 @@ def test_non_object_line_is_reported_not_crash(tmp_path):
     p.write_text("[1]\n", encoding="utf-8")
     records, errors = load_labels(p)
     assert records == [] and errors and errors[0].startswith("1줄")
+
+
+# (사례, 관여 행위, 정답 근거, 예인 단계) — 라벨 지침 v26100303 6절의 번역 경로 사례
+STAGE_CASES = [
+    ("L04 한국어 초안을 ChatGPT로 번역", [Act.TRANSLATION], "A", {"ai_translation"}),
+    (
+        "L05 AI 번역 뒤 재작성",
+        [Act.TRANSLATION, Act.REWRITING],
+        "A",
+        {"ai_translation", "body"},
+    ),
+    ("L13 자동 완성 단어", [Act.PROOFREADING], "A", {"ai_polishing"}),
+    ("L19 사람 번역 기관", [], "A", set()),
+    ("L20 Papago 번역", [Act.MACHINE_TRANSLATION], "A", {"machine_translation"}),
+    (
+        "L21 Papago 뒤 문법만 AI 교정",
+        [Act.MACHINE_TRANSLATION, Act.PROOFREADING],
+        "A",
+        {"machine_translation", "ai_polishing"},
+    ),
+    ("L22 한국어 AI 초안 뒤 사람 번역", [Act.GENERATION], "A", {"body"}),
+    (
+        "L23 기관의 기계 번역 초벌",
+        [Act.MACHINE_TRANSLATION],
+        "A",
+        {"machine_translation"},
+    ),
+    ("L24 영어 직접 작성 뒤 AI 문법 검사", [Act.PROOFREADING], "A", {"ai_polishing"}),
+]
+
+
+@pytest.mark.parametrize(
+    ("case", "acts", "basis", "yes"), STAGE_CASES, ids=[c[0][:3] for c in STAGE_CASES]
+)
+def test_stage_cases(case, acts, basis, yes):
+    from peerreview.labels import derive_stages
+
+    rec = LabelRecord(
+        doc_id=case, bundle_id="b", truth_basis=TruthBasis(basis), acts=acts
+    )
+    stages = {k.value: v for k, v in derive_stages(rec).items()}
+    assert {k for k, v in stages.items() if v == YES} == yes
+    assert all(
+        v == NO for k, v in stages.items() if k not in yes
+    )  # 근거 A이면 나머지는 아니오
+
+
+def test_basis_d_does_not_rule_out_machine_translation():
+    from peerreview.labels import derive_stages
+    from peerreview.model import Stage
+
+    st = derive_stages(LabelRecord("d", "b", TruthBasis.D))
+    assert st[Stage.MACHINE_TRANSLATION] == UNK
+    assert st[Stage.BODY] == st[Stage.AI_TRANSLATION] == st[Stage.AI_POLISHING] == NO
+
+
+def test_korean_draft_span_and_stored_stage_mismatch(tmp_path):
+    rec = LabelRecord(
+        "d", "b", TruthBasis.A, [Act.GENERATION], [Span(Act.GENERATION, "draft", "ko")]
+    )
+    assert validate(rec) == []
+    assert validate(
+        LabelRecord(
+            "d", "b", TruthBasis.A, [Act.GENERATION], [Span(Act.GENERATION, "x", "jp")]
+        )
+    )
+    p = tmp_path / "l.jsonl"
+    save_labels(p, [rec])
+    row = json.loads(p.read_text(encoding="utf-8"))
+    assert row["stages"]["body"] == "yes" and row["spans"][0]["lang"] == "ko"
+    row["stages"]["ai_translation"] = "yes"
+    p.write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
+    _, errors = load_labels(p)
+    assert any("stages.ai_translation" in e for e in errors)
+
+
+def test_variant_rest_basis_keeps_machine_translation_unknown():
+    from peerreview.labels import derive_stages
+    from peerreview.model import Stage
+
+    v = LabelRecord("v", "b", TruthBasis.A, [Act.REWRITING], rest_basis=TruthBasis.D)
+    st = derive_stages(v)
+    assert st[Stage.BODY] == YES
+    assert (
+        st[Stage.AI_TRANSLATION] == NO
+    )  # 바꾼 부분(A)과 원문(D) 모두 생성형 AI 번역을 배제한다
+    assert st[Stage.MACHINE_TRANSLATION] == UNK  # 원문(D) 부분의 기계 번역은 모른다
+
+
+def test_save_refuses_inconsistent_and_d_allows_machine_translation(tmp_path):
+    bad = LabelRecord("d", "b", TruthBasis.A, [Act.GENERATION], target_present=NO)
+    with pytest.raises(ValueError):
+        save_labels(tmp_path / "x.jsonl", [bad])
+    assert not (tmp_path / "x.jsonl").exists()
+    mt_old = LabelRecord("d", "b", TruthBasis.D, [Act.MACHINE_TRANSLATION])
+    assert validate(mt_old) == []
+    assert validate(LabelRecord("d", "b", TruthBasis.D, [Act.GENERATION]))
+
+
+def test_non_object_stages_reported(tmp_path):
+    p = tmp_path / "l.jsonl"
+    p.write_text(
+        '{"doc_id": "d", "bundle_id": "b", "truth_basis": "A", "stages": ["body"]}\n',
+        encoding="utf-8",
+    )
+    _, errors = load_labels(p)
+    assert any("stages가 객체가 아님" in e for e in errors)

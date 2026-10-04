@@ -72,18 +72,22 @@
         "machine_translation": "별도 범주로 기록",
         "competitor_survey": "실시(docs/기존서비스조사.md)",
         "decided_at": "2026-10-04"
+      },
+      "t001b": {
+        "goal_doc": "목표정의서-v26100303",
+        "label_guide": "라벨지침-v26100303",
+        "approved": "2026-10-04"
       }
     }
   },
   "current": {
-    "task_id": "T001b",
-    "title": "목표 정의서·라벨 지침 개정(번역 경로 반영)",
+    "task_id": "T002.9",
+    "title": "한→영 번역 자료 출처 조사",
     "status": "todo",
     "done_when": [
-      "행위별 시범 묶음 5개, 재분류가 의도와 일치",
-      "생성 기록(모델·버전·입력문·시점·원출력)으로 변형본을 다시 대조할 수 있다"
+      "docs/번역자료출처조사.md에 출처별 이용 조건·규모·형식·짝 여부·외부 전송 가능 여부"
     ],
-    "next_action": "사용자가 목표 정의서 개정안(번역 경로·단계별 판정·번역 평가 집단)을 승인한다",
+    "next_action": "T002.9 시작: 한국어 화학공학 논문과 사람 번역본 출처 조사",
     "blockers": [
       "디스크 여유 9.5GiB(96% 사용): 로컬 모델 비교 전 공간 확인 필요"
     ]
@@ -177,6 +181,26 @@
       "status": "todo",
       "done_when": [
         "모델별 첨자 표기 방식 집계가 있다"
+      ],
+      "evidence": "",
+      "commits": []
+    },
+    {
+      "id": "T001b",
+      "title": "목표 정의서·라벨 지침 개정(번역 경로 반영)",
+      "status": "done",
+      "done_when": [
+        "목표정의서·라벨지침 v26100303, 단계별 판정 코드와 시험"
+      ],
+      "evidence": "목표정의서·라벨지침 v26100303, model.Stage/STAGE_ACTS, labels.derive_stages·rest_basis, pytest 82 passed, check-labels 30건 오류 0",
+      "commits": []
+    },
+    {
+      "id": "T002.9",
+      "title": "한→영 번역 자료 출처 조사",
+      "status": "todo",
+      "done_when": [
+        "docs/번역자료출처조사.md에 출처별 이용 조건·규모·형식·짝 여부·외부 전송 가능 여부"
       ],
       "evidence": "",
       "commits": []

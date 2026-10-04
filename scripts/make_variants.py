@@ -241,6 +241,7 @@ def build() -> None:
             acts=[act],
             spans=[Span(act, loc) for loc in t.target_locs],
             checked_scope="서론 앞 3문단만 바꿈. 나머지는 씨앗 원문(근거 D)",
+            rest_basis=TruthBasis.D,
             tools=[out["model"]],
             notes=f"의도한 행위 {t.act}. {chk.note}".strip(),
         )

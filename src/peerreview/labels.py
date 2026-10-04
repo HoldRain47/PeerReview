@@ -1,6 +1,6 @@
 """정답 라벨 기록 형식과 검사 (T002.3).
 
-근거: docs/라벨지침-v26100302.md 1절(필드), 2절(정답 근거 수준), 4절(판정 절차).
+근거: docs/라벨지침-v26100303.md 1절(필드), 2절(정답 근거 수준), 4절(단계별 판정 절차).
 라벨은 JSON Lines 파일 한 줄에 문서 하나로 저장한다. 원고 원문은 넣지 않는다.
 """
 
@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from peerreview.model import TARGET_ACTS, InvolvementAct
+from peerreview.model import STAGE_ACTS, InvolvementAct, Stage
 
 
 class TruthBasis(StrEnum):
@@ -24,7 +24,7 @@ class TruthBasis(StrEnum):
 
 
 class TargetPresence(StrEnum):
-    """1차 목표 행위(생성·재작성)가 논문에 있었는가."""
+    """한 판정 단계의 행위가 논문에 있었는가."""
 
     YES = "yes"
     NO = "no"
@@ -35,6 +35,7 @@ class TargetPresence(StrEnum):
 class Span:
     act: InvolvementAct
     loc: str  # 원문 위치(ingest의 loc 형식이나 절 이름)
+    lang: str = "en"  # 행위가 일어난 글의 언어. 한국어 초안 단계면 "ko"
 
 
 @dataclass
@@ -47,32 +48,55 @@ class LabelRecord:
     checked_scope: str = ""
     tools: list[str] = field(default_factory=list)
     notes: str = ""
-    target_present: TargetPresence | None = None  # 비우면 derive_target으로 채운다
+    # 기록이 일부 구간만 다룰 때(변형본), 나머지 구간의 근거. 예: 씨앗 원문 부분은 D
+    rest_basis: TruthBasis | None = None
+    # 본문 단계의 판정(이전 판과 호환). 비우면 계산한다. 기록에 있으면 계산값과 대조한다.
+    target_present: TargetPresence | None = None
 
     def to_json(self) -> str:
         data = asdict(self)
-        data["target_present"] = (self.target_present or derive_target(self)).value
+        # 저장하는 판정은 언제나 계산값이다. 어긋난 값은 save_labels가 막는다.
+        data["target_present"] = derive_target(self).value
+        data["stages"] = {k.value: v.value for k, v in derive_stages(self).items()}
         return json.dumps(data, ensure_ascii=False)
 
 
-def derive_target(rec: LabelRecord) -> TargetPresence:
-    """라벨 지침 4절의 4~5번 단계.
+def derive_stage(rec: LabelRecord, stage: Stage) -> TargetPresence:
+    """라벨 지침 4절 5~6번. 한 단계의 판정.
 
-    - 관여 행위에 목표 행위가 하나라도 있으면 예.
-    - 목표 행위가 없다는 근거가 A 또는 D이고 미상 행위가 없으면 아니오.
-    - 그 밖(B, C, 미상 행위 포함)은 미상.
+    - 그 단계의 행위가 acts에 있으면 예.
+    - 없고 unknown 행위도 없으며 근거가 A이면 아니오. 근거 D는 기계 번역 단계를 뺀 단계에서만 아니오.
+    - 그 밖(B, C, unknown 포함, D의 기계 번역 단계)은 미상.
 
     해석: acts에 unknown이 섞이면 근거가 A여도 아니오로 확정하지 않는다. 모르는 부분에
-    목표 행위가 있었을 수 있어서다(라벨 지침 1절 "모르면 unknown", 3절 "편의상 배정하지 않는다").
+    그 행위가 있었을 수 있어서다. D(2017~2021년 공개)는 생성형 AI가 없었다는 근거일 뿐, 그때도 널리
+    쓰인 기계 번역이 없었다는 근거는 아니다.
     """
     acts = set(rec.acts)
-    if acts & TARGET_ACTS:
+    if acts & STAGE_ACTS[stage]:
         return TargetPresence.YES
     if InvolvementAct.UNKNOWN in acts:
         return TargetPresence.UNKNOWN
-    if rec.truth_basis in (TruthBasis.A, TruthBasis.D):
+    bases = [rec.truth_basis] + ([rec.rest_basis] if rec.rest_basis else [])
+    # 모든 구간의 근거가 "아니오"를 뒷받침해야 아니오다(변형본의 나머지 원문 부분 포함)
+    if all(_rules_out(b, stage) for b in bases):
         return TargetPresence.NO
     return TargetPresence.UNKNOWN
+
+
+def _rules_out(basis: TruthBasis, stage: Stage) -> bool:
+    if basis == TruthBasis.A:
+        return True
+    return basis == TruthBasis.D and stage != Stage.MACHINE_TRANSLATION
+
+
+def derive_stages(rec: LabelRecord) -> dict[Stage, TargetPresence]:
+    return {stage: derive_stage(rec, stage) for stage in Stage}
+
+
+def derive_target(rec: LabelRecord) -> TargetPresence:
+    """본문 생성·재작성 단계의 판정(이전 판의 target_present)."""
+    return derive_stage(rec, Stage.BODY)
 
 
 def validate(rec: LabelRecord) -> list[str]:
@@ -84,13 +108,18 @@ def validate(rec: LabelRecord) -> list[str]:
         errors.append("bundle_id가 비어 있음(학습·시험 분리의 단위라 필수)")
     if len(set(rec.acts)) != len(rec.acts):
         errors.append("acts에 같은 행위가 두 번 있음")
-    if rec.truth_basis == TruthBasis.D and rec.acts:
-        errors.append("근거 D(AI 보급 이전 자료)인데 관여 행위가 있음")
+    # 근거 D(2017~2021 공개)는 생성형 AI 행위를 가질 수 없다. 기계 번역은 그때도 있었으므로 허용한다.
+    if rec.truth_basis == TruthBasis.D and set(rec.acts) - {
+        InvolvementAct.MACHINE_TRANSLATION
+    }:
+        errors.append("근거 D(AI 보급 이전 자료)인데 기계 번역이 아닌 관여 행위가 있음")
     for sp in rec.spans:
         if sp.act not in rec.acts:
             errors.append(f"spans의 행위 {sp.act.value}가 acts에 없음")
         if not sp.loc.strip():
             errors.append("spans에 위치(loc)가 빈 항목이 있음")
+        if sp.lang not in ("en", "ko"):
+            errors.append(f"spans의 언어 {sp.lang!r}가 en·ko가 아님")
     derived = derive_target(rec)
     if rec.target_present is not None and rec.target_present != derived:
         errors.append(
@@ -110,12 +139,17 @@ def from_dict(data: dict) -> LabelRecord:
         truth_basis=TruthBasis(data["truth_basis"]),
         acts=[InvolvementAct(a) for a in data.get("acts", [])],
         spans=[
-            Span(InvolvementAct(s["act"]), str(s.get("loc", "")))
+            Span(
+                InvolvementAct(s["act"]),
+                str(s.get("loc", "")),
+                str(s.get("lang", "en")),
+            )
             for s in data.get("spans", [])
         ],
         checked_scope=str(data.get("checked_scope", "")),
         tools=[str(t) for t in data.get("tools", [])],
         notes=str(data.get("notes", "")),
+        rest_basis=TruthBasis(data["rest_basis"]) if data.get("rest_basis") else None,
         target_present=TargetPresence(tp) if tp else None,
     )
 
@@ -129,7 +163,8 @@ def load_labels(path: Path) -> tuple[list[LabelRecord], list[str]]:
         if not line.strip():
             continue
         try:
-            rec = from_dict(json.loads(line))
+            data = json.loads(line)
+            rec = from_dict(data)
         except (
             json.JSONDecodeError,
             KeyError,
@@ -140,6 +175,16 @@ def load_labels(path: Path) -> tuple[list[LabelRecord], list[str]]:
             errors.append(f"{no}줄: 읽을 수 없음({type(e).__name__})")
             continue
         errors += [f"{no}줄: {m}" for m in validate(rec)]
+        stored = data.get("stages") or {}
+        if not isinstance(stored, dict):
+            errors.append(f"{no}줄: stages가 객체가 아님")
+            stored = {}
+        derived = {k.value: v.value for k, v in derive_stages(rec).items()}
+        for stage, value in stored.items():
+            if derived.get(stage) != value:
+                errors.append(
+                    f"{no}줄: stages.{stage}가 {value}인데 판정 절차로는 {derived.get(stage)}임"
+                )
         if rec.doc_id in seen:
             errors.append(f"{no}줄: doc_id {rec.doc_id}가 중복됨")
         seen.add(rec.doc_id)
@@ -148,4 +193,8 @@ def load_labels(path: Path) -> tuple[list[LabelRecord], list[str]]:
 
 
 def save_labels(path: Path, records: list[LabelRecord]) -> None:
+    """검사를 통과한 기록만 저장한다. 하나라도 잘못되면 아무것도 쓰지 않고 ValueError를 낸다."""
+    errors = [f"{r.doc_id}: {m}" for r in records for m in validate(r)]
+    if errors:
+        raise ValueError("라벨 저장 거부: " + "; ".join(errors[:5]))
     path.write_text("".join(r.to_json() + "\n" for r in records), encoding="utf-8")
