@@ -110,3 +110,8 @@
 - 결과: 입력 처리가 정규화 전에 유니코드 첨자·LaTeX·마크업 첨자를 구간별로 센다. inspect에도 나온다.
 - 증거: `uv run pytest -q` 87 passed. 사람 작성 XML 300편 0건, 출판사 PDF 1편 18건(그래프 범례 m², 오탐 경로).
 - 남은 것: T002.5b(AI가 첨자를 어떻게 내놓는지), PDF 서식 첨자와 유니코드 첨자 혼용 신호(T003 이후).
+
+## 2026-10-04 T002.5b AI의 화학식 첨자 표기 [done]
+- 결과: 서식 지시 없이 같은 요청을 주니 OpenAI chat-latest(API)는 평문 CO2, Claude Sonnet(하위 에이전트)은 유니코드 CO₂를 썼다. Claude는 재작성에서 입력의 평문을 유니코드로 바꿨다.
+- 증거: data/public/variants/subscript/report.json, OpenAI 0.2595달러(누적 0.5483).
+- 남은 것: 웹 화면 복사본 시험(사용자 몇 건), 혼용 신호 구현(T003 이후).
